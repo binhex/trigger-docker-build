@@ -1,10 +1,13 @@
 appdirs==1.4.3
-argparse==1.4.0
 backoff==1.4.0
 BeautifulSoup==3.2.1
 configobj==5.0.6
+meld3==1.0.2
 packaging==16.8
+pex==1.2.4
 pyparsing==2.2.0
 requests==2.13.0
+schedule==0.4.2
 six==1.10.0
+supervisor==3.3.1
 yagmail==0.6.159
