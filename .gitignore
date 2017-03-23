@@ -6,3 +6,6 @@ todo.txt
 *.pyc
 # Ignore virtualenv environment
 venv
+
+# Ignore all log files
+*.log
