@@ -227,24 +227,21 @@ def http_client(**kwargs):
 
             session.auth = auth
 
-        if request_type == "get":
+        if request_type == "put":
 
-            # use keyword argument unpack
-            response = session.get(**requests_data_dict)
-
-        elif request_type == "put":
-
+            # add additional keyword arguments
             requests_data_dict.update({'data': data_payload})
-
-            # use keyword argument unpack
-            response = session.put(**requests_data_dict)
 
         elif request_type == "post":
 
+            # add additional keyword arguments
             requests_data_dict.update({'data': data_payload})
 
-            # use keyword argument unpack
-            response = session.post(**requests_data_dict)
+        # construct class.method from request_type
+        request_method = getattr(session, request_type)
+
+        # use keyword argument unpack to convert dict to keyword args
+        response = request_method(**requests_data_dict)
 
         # get status code and content returned
         status_code = response.status_code
@@ -252,8 +249,7 @@ def http_client(**kwargs):
 
         if status_code == 401:
 
-            app_log.warning(
-                u"The status code %s indicates the github personal token is revoked %s, error is %s" % (status_code, url, content))
+            app_log.warning(u"The status code %s indicates the github personal token is revoked %s, error is %s" % (status_code, url, content))
             raise requests.exceptions.HTTPError
 
         elif status_code == 404:
