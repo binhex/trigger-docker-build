@@ -147,11 +147,21 @@ def http_client(**kwargs):
             return 1, None
 
         if "user_agent" in kwargs:
+
             user_agent = kwargs['user_agent']
 
         else:
 
             app_log.warning(u'No User Agent sent to function, exiting function...')
+            return 1, None
+
+        if "request_type" in kwargs:
+
+            request_type = kwargs['request_type']
+
+        else:
+
+            app_log.warning(u'No request type (get/put/post) sent to function, exiting function...')
             return 1, None
 
         # optional stuff to include
@@ -185,15 +195,6 @@ def http_client(**kwargs):
         return 1
 
     # add headers for gzip support and custom user agent string
-    headers = {
-        'Accept-encoding': 'gzip',
-        'User-Agent': user_agent
-    }
-
-    if "additional_header" in kwargs:
-
-        # add any additional headers
-        headers.update(additional_header)
 
     # set connection timeout value (max time to wait for connection)
     connect_timeout = 10.0
@@ -209,18 +210,43 @@ def http_client(**kwargs):
 
     try:
 
-        if "data_payload" in kwargs:
+        # define dict of common arguments for requests
+        requests_data_dict = {'url': url, 'timeout': (connect_timeout, read_timeout), 'allow_redirects': True, 'verify': False}
 
-            # request url get with timeouts and custom headers
-            response = session.post(url=url, auth=auth, timeout=(connect_timeout, read_timeout), headers=headers, allow_redirects=True, verify=False, data=data_payload)
+        session.headers = {
+            'Accept-encoding': 'gzip',
+            'User-Agent': user_agent
+        }
 
-        else:
+        if "additional_header" in kwargs:
 
-            # request url get with timeouts and custom headers
-            response = session.get(url=url, auth=auth, timeout=(connect_timeout, read_timeout), headers=headers, allow_redirects=True,
-                                   verify=False)
+            # append to headers dict with additional headers dict
+            session.headers.update(additional_header)
 
-        # get status code and content downloaded
+        if "auth" in kwargs:
+
+            session.auth = auth
+
+        if request_type == "get":
+
+            # use keyword argument unpack
+            response = session.get(**requests_data_dict)
+
+        elif request_type == "put":
+
+            requests_data_dict.update({'data': data_payload})
+
+            # use keyword argument unpack
+            response = session.put(**requests_data_dict)
+
+        elif request_type == "post":
+
+            requests_data_dict.update({'data': data_payload})
+
+            # use keyword argument unpack
+            response = session.post(**requests_data_dict)
+
+        # get status code and content returned
         status_code = response.status_code
         content = response.content
 
@@ -299,12 +325,12 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     github_tag_name = "%s-01" % current_version
     github_release_name = "API/URL triggered release"
     github_release_body = github_tag_name
-    http_request_type = "post"
+    request_type = "post"
     http_url = 'https://api.github.com/repos/%s/%s/releases?access_token=%s' % (target_repo_owner, target_repo_name, target_access_token)
-    http_data_payload = '{"tag_name": "%s","target_commitish": "master","name": "%s","body": "%s","draft": false,"prerelease": false}' % (github_tag_name, github_release_name, github_release_body)
+    data_payload = '{"tag_name": "%s","target_commitish": "master","name": "%s","body": "%s","draft": false,"prerelease": false}' % (github_tag_name, github_release_name, github_release_body)
 
     # process post request
-    status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, request_type=http_request_type, data_payload=http_data_payload)
+    status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, request_type=request_type, data_payload=data_payload)
     return status_code, content
 
 
