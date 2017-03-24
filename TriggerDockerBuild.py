@@ -330,7 +330,7 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     return status_code, content
 
 
-def monitor_sites():
+def monitor_sites(schedule_check_mins):
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
@@ -477,16 +477,16 @@ def monitor_sites():
 
         app_log.info(u"Processing finished for application %s" % source_app_name)
 
-    app_log.info(u"All applications processed, waiting for next invocation...")
+    app_log.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
 
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
     app_log.info(u"Monitoring sites for application version changes...")
 
-    config_schedule_check_mins = config_obj["general"]["schedule_check_mins"]
-    app_log.info(u"Checking for changes every %s minutes..." % config_schedule_check_mins)
-    schedule.every(config_schedule_check_mins).minutes.do(monitor_sites)
+    schedule_check_mins = config_obj["general"]["schedule_check_mins"]
+    app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
+    schedule.every(schedule_check_mins).minutes.do(monitor_sites(schedule_check_mins))
 
     while True:
 
