@@ -103,7 +103,7 @@ def app_logging():
 
     return app_logger
 
-app_log = app_logging()
+
 
 
 def notification_email(app_name, repo_name, target_repo_name, previous_version, current_version):
@@ -483,15 +483,16 @@ def monitor_sites(schedule_check_mins):
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
-    app_log.info(u"Monitoring sites for application version changes...")
-
-    schedule_check_mins = config_obj["general"]["schedule_check_mins"]
-    app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
-
-    # run process daemonized
     with daemon.DaemonContext():
 
-        schedule.every(schedule_check_mins).minutes.do(monitor_sites(schedule_check_mins))
+        app_log = app_logging()
+
+        app_log.info(u"Monitoring sites for application version changes...")
+
+        schedule_check_mins = config_obj["general"]["schedule_check_mins"]
+        app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
+
+        schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
 
         while True:
 
