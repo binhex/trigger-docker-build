@@ -10,6 +10,7 @@ import json
 import yagmail
 import schedule
 import time
+import daemon
 
 # ensure we correctly handle all keyboard interrupts
 import signal
@@ -486,16 +487,20 @@ if __name__ == '__main__':
 
     schedule_check_mins = config_obj["general"]["schedule_check_mins"]
     app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
-    schedule.every(schedule_check_mins).minutes.do(monitor_sites(schedule_check_mins))
 
-    while True:
+    # run process daemonized
+    with daemon.DaemonContext():
 
-        try:
+        schedule.every(schedule_check_mins).minutes.do(monitor_sites(schedule_check_mins))
 
-            schedule.run_pending()
-            time.sleep(1)
+        while True:
 
-        except KeyboardInterrupt:
+            try:
 
-            app_log.info(u"Keyboard interrupt received, exiting script...")
-            sys.exit()
+                schedule.run_pending()
+                time.sleep(1)
+
+            except KeyboardInterrupt:
+
+                app_log.info(u"Keyboard interrupt received, exiting script...")
+                sys.exit()
