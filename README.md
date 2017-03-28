@@ -1,37 +1,34 @@
-**Application**
+**Application:**
 TriggerDockerBuild
 
-**Description**
+**Description:**
 A Python script to monitor GitHub, Arch Repository and Arch User Repository for version changes, if a change is identified then we create a new GitHub release which then triggers a Docker Hub build.
 
-**Features**
+**Features:**
 - GitHub monitoring
 - Arch Repository monitoring
 - Arch User Repository (AUR) monitoring
 
-**Windows Installation**
+**Windows Installation:**
 TBA
 
-**Linux Installation**
+**Linux Installation:**
 - Install Python 2.7.x
 - Download the zipped source from https://github.com/binhex/trigger-docker-build/archive/master.zip
 - Unpack the zipped sounrce
 
-**Usage**
+**Usage:**
 ```
 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --daemon
 ```
 
-**Changelog**
-ver 1.0.0
-
-**Future**
+**Future:**
 - Use Beautiful Soup to also web scrape for non API sites.
 - Monitor Docker Hub "Build Details" for success/failure.
 - Add in action of notify or trigger for version changes.
 - Send Kodi notification.
 
-**Known Issues**
+**Known Issues:**
 - TBA
 ___
 If you appreciate my work, then please consider buying me a beer  :D
