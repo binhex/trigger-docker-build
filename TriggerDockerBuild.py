@@ -433,19 +433,19 @@ def monitor_sites(schedule_check_mins):
                 current_version = "0.0"
 
         # write value for current match to config
-        config_obj["results"]["%s_%s_current_version" % (source_site_name, source_app_name)] = current_version
+        config_obj["results"]["%s_%s_%s_current_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
         config_obj.write()
 
         try:
 
             # read value from previous match from config
-            previous_version = config_obj["results"]["%s_%s_previous_version" % (source_site_name, source_app_name)]
+            previous_version = config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)]
 
         except KeyError:
 
             app_log.info(u"No known previous version for app %s, assuming first run" % source_app_name)
             app_log.info(u"Setting previous version to current version %s and going to next iteration" % current_version)
-            config_obj["results"]["%s_%s_previous_version" % (source_site_name, source_app_name)] = current_version
+            config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
             continue
 
@@ -457,7 +457,7 @@ def monitor_sites(schedule_check_mins):
             if status_code == 0:
 
                 app_log.info(u"Setting previous version %s to the same as current version %s after successful build" % (previous_version, current_version))
-                config_obj["results"]["%s_%s_previous_version" % (source_site_name, source_app_name)] = current_version
+                config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
                 config_obj.write()
 
                 # send email notification
@@ -479,11 +479,12 @@ def monitor_sites(schedule_check_mins):
 
 def start():
 
-    app_log.info(u"Monitoring sites for application version changes...")
-
     schedule_check_mins = config_obj["general"]["schedule_check_mins"]
-    app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
 
+    app_log.info(u"Initial check for version changes...")
+    monitor_sites(schedule_check_mins)
+
+    # now run monitor_sites function via scheduler
     schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
 
     while True:
