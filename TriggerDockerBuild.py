@@ -110,8 +110,8 @@ def notification_email(app_name, repo_name, target_repo_name, previous_version, 
     config_email_to = config_obj["notification"]["email_to"]
 
     # construct url to docker hub build details
-    config_target_repo_owner = config_obj["general"]["target_repo_owner"]
-    dockerhub_build_details = "https://hub.docker.com/r/%s/%s/builds/" % (config_target_repo_owner, target_repo_name)
+    target_repo_owner = config_obj["general"]["target_repo_owner"]
+    dockerhub_build_details = "https://hub.docker.com/r/%s/%s/builds/" % (target_repo_owner, target_repo_name)
 
     app_log.info(u'Sending email notification...')
 
@@ -120,11 +120,12 @@ def notification_email(app_name, repo_name, target_repo_name, previous_version, 
     html = '''
     <b>Status:</b> Release triggered<br>
     <b>Application:</b> %s<br>
-    <b>Repository:</b> %s<br>
+    <b>Source Repository:</b> %s<br>
+    <b>Target Repository:</b> %s<br>
     <b>Previous Version:</b> %s<br>
     <b>Current Version:</b> %s<br>
     <b>Docker Hub:</b> <a href="%s">Build Details</a><br>
-    ''' % (app_name, repo_name, previous_version, current_version, dockerhub_build_details)
+    ''' % (app_name, repo_name, target_repo_name, previous_version, current_version, dockerhub_build_details)
     yag.send(to = config_email_to, subject = subject, contents = [html])
 
 
