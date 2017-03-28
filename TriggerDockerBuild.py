@@ -1,5 +1,6 @@
 import requests
 import configobj
+import argparse
 import os
 import sys
 import socket
@@ -11,14 +12,10 @@ import yagmail
 import schedule
 import time
 import daemon
-
-# ensure we correctly handle all keyboard interrupts
-import signal
-signal.signal(signal.SIGINT, signal.default_int_handler)
-
-# required to suppress ssl warning for urllib3 (requests uses urllib3)
 import requests.packages.urllib3
-requests.packages.urllib3.disable_warnings()
+requests.packages.urllib3.disable_warnings() # required to suppress ssl warning for urllib3 (requests uses urllib3)
+import signal
+signal.signal(signal.SIGINT, signal.default_int_handler) # ensure we correctly handle all keyboard interrupts
 
 dht_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
 
@@ -40,8 +37,7 @@ logs_dir = os.path.normpath(logs_dir)
 app_log_file = os.path.join(logs_dir, u"app.log")
 
 # create configobj instance, set config.ini file, set encoding and set configspec.ini file
-config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8',
-                                default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
+config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
 
 user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
 
@@ -480,28 +476,64 @@ def monitor_sites(schedule_check_mins):
 
     app_log.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
 
+
+def start():
+
+    app_log.info(u"Monitoring sites for application version changes...")
+
+    schedule_check_mins = config_obj["general"]["schedule_check_mins"]
+    app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
+
+    schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
+
+    while True:
+
+        try:
+
+            schedule.run_pending()
+            time.sleep(1)
+
+        except KeyboardInterrupt:
+
+            app_log.info(u"Keyboard interrupt received, exiting script...")
+            sys.exit()
+
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
-    with daemon.DaemonContext():
+    version = "1.0.0"
+    app_log = app_logging()
 
-        app_log = app_logging()
+    # custom argparse to redirect user to help if unknown argument specified
+    class ArgparseCustom(argparse.ArgumentParser):
 
-        app_log.info(u"Monitoring sites for application version changes...")
+        def error(self, message):
+            sys.stderr.write('error: %s\n' % message)
+            self.print_help()
+            sys.exit(2)
 
-        schedule_check_mins = config_obj["general"]["schedule_check_mins"]
-        app_log.info(u"Checking for changes every %s minutes..." % schedule_check_mins)
+    # setup argparse description and usage, also increase spacing for help to 50
+    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--pidfile <path>] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
 
-        schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
+    # add argparse command line flags
+    commandline_parser.add_argument(u"--config", metavar=u"<path>", help=u"specify path for config file e.g. --config /opt/triggerdockerbuild/config/")
+    commandline_parser.add_argument(u"--logs", metavar=u"<path>", help=u"specify path for log files e.g. --logs /opt/triggerdockerbuild/logs/")
+    commandline_parser.add_argument(u"--pidfile", metavar=u"<path>", help=u"specify path to pidfile e.g. --pid /var/run/triggerdockerbuild/triggerdockerbuild.pid")
+    commandline_parser.add_argument(u"--daemon", action=u"store_true", help=u"run as daemonized process")
+    commandline_parser.add_argument(u"--version", action=u"version", version=version)
 
-        while True:
+    # save arguments in dictionary
+    args = vars(commandline_parser.parse_args())
 
-            try:
+    # check os is not windows and then run main process as daemonized process
+    if args["daemon"] is True and os.name != "nt":
 
-                schedule.run_pending()
-                time.sleep(1)
+        app_log.info(u"Running as a daemonized process...")
+        with daemon.DaemonContext():
 
-            except KeyboardInterrupt:
+            start()
 
-                app_log.info(u"Keyboard interrupt received, exiting script...")
-                sys.exit()
+    else:
+
+            app_log.info(u"Running as a foreground process...")
+            start()
