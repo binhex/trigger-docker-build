@@ -13,9 +13,13 @@ import schedule
 import time
 import daemon
 import requests.packages.urllib3
-requests.packages.urllib3.disable_warnings() # required to suppress ssl warning for urllib3 (requests uses urllib3)
 import signal
+requests.packages.urllib3.disable_warnings() # required to suppress ssl warning for urllib3 (requests uses urllib3)
 signal.signal(signal.SIGINT, signal.default_int_handler) # ensure we correctly handle all keyboard interrupts
+
+# TODO change input to functions as dictionary
+# TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
+# TODO change return for function to dictionary
 
 dht_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
 
@@ -97,12 +101,10 @@ def app_logging():
 
         console_streamhandler.setLevel(logging.ERROR)
 
-    return app_logger
+    return {'logger':app_logger, 'handler':app_rotatingfilehandler}
 
 
-
-
-def notification_email(app_name, repo_name, target_repo_name, previous_version, current_version):
+def notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version):
 
     # read email config
     config_email_username = config_obj["notification"]["email_username"]
@@ -113,19 +115,25 @@ def notification_email(app_name, repo_name, target_repo_name, previous_version, 
     target_repo_owner = config_obj["general"]["target_repo_owner"]
     dockerhub_build_details = "https://hub.docker.com/r/%s/%s/builds/" % (target_repo_owner, target_repo_name)
 
-    app_log.info(u'Sending email notification...')
+    app_logger_instance.info(u'Sending email notification...')
 
     yag = yagmail.SMTP(config_email_username, config_email_password)
-    subject = 'Trigger Build: [%s] - version changed from %s to %s' % (app_name, previous_version, current_version)
+    subject = '[%s] %s - version changed from %s to %s' % (source_app_name, action, previous_version, current_version)
     html = '''
-    <b>Status:</b> Release triggered<br>
-    <b>Application:</b> %s<br>
-    <b>Source Repository:</b> %s<br>
-    <b>Target Repository:</b> %s<br>
+    <b>Action:</b> %s<br>
     <b>Previous Version:</b> %s<br>
     <b>Current Version:</b> %s<br>
-    <b>Docker Hub:</b> <a href="%s">Build Details</a><br>
-    ''' % (app_name, repo_name, target_repo_name, previous_version, current_version, dockerhub_build_details)
+    <b>Source Site Name:</b> %s<br>
+    <b>Source Repository:</b> %s<br>
+    <b>Source App Name:</b> %s<br>
+    <b>Source Site URL:</b> %s<br>
+    <b>Target Repository:</b> %s<br>
+    ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, target_repo_name)
+
+    if action == "trigger":
+
+        html += '''<b>Target Build URL:</b> %s<br>''' % dockerhub_build_details
+
     yag.send(to = config_email_to, subject = subject, contents = [html])
 
 
@@ -141,7 +149,7 @@ def http_client(**kwargs):
 
         else:
 
-            app_log.warning(u'No URL sent to function, exiting function...')
+            app_logger_instance.warning(u'No URL sent to function, exiting function...')
             return 1, None
 
         if "user_agent" in kwargs:
@@ -150,7 +158,7 @@ def http_client(**kwargs):
 
         else:
 
-            app_log.warning(u'No User Agent sent to function, exiting function...')
+            app_logger_instance.warning(u'No User Agent sent to function, exiting function...')
             return 1, None
 
         if "request_type" in kwargs:
@@ -159,7 +167,7 @@ def http_client(**kwargs):
 
         else:
 
-            app_log.warning(u'No request type (get/put/post) sent to function, exiting function...')
+            app_logger_instance.warning(u'No request type (get/put/post) sent to function, exiting function...')
             return 1, None
 
         # optional stuff to include
@@ -189,7 +197,7 @@ def http_client(**kwargs):
 
     else:
 
-        app_log.warning(u'No keyword args sent to function, exiting function...')
+        app_logger_instance.warning(u'No keyword args sent to function, exiting function...')
         return 1
 
     # add headers for gzip support and custom user agent string
@@ -204,6 +212,7 @@ def http_client(**kwargs):
     session = requests.Session()
 
     # set status_code and content to None in case nothing returned
+    status_code = None
     content = None
 
     try:
@@ -247,71 +256,64 @@ def http_client(**kwargs):
 
         if status_code == 401:
 
-            app_log.warning(u"The status code %s indicates the github personal token is revoked %s, error is %s" % (status_code, url, content))
+            app_logger_instance.warning(u"The status code %s indicates unauthorised access for %s, error is %s" % (status_code, url, content))
             raise requests.exceptions.HTTPError
 
         elif status_code == 404:
 
-            app_log.warning(u"The status code %s indicates the remote site is down for %s, error is %s" % (status_code, url, content))
+            app_logger_instance.warning(u"The status code %s indicates the requested resource could not be found  for %s, error is %s" % (status_code, url, content))
             raise requests.exceptions.HTTPError
 
         elif status_code == 422:
 
-            app_log.warning(u"The status code %s indicates a duplicate release already exists on github for %s, error is %s" % (status_code, url, content))
+            app_logger_instance.warning(u"The status code %s indicates a request was well-formed but was unable to be followed due to semantic errors for %s, error is %s" % (status_code, url, content))
             raise requests.exceptions.HTTPError
 
-        elif status_code != 200 and status_code != 201:
+        elif not 200 <= status_code <= 299:
 
-            app_log.warning(u"The status code %s indicates an unexpected error for %s, error is %s" % (status_code, url, content))
+            app_logger_instance.warning(u"The status code %s indicates an unexpected error for %s, error is %s" % (status_code, url, content))
             raise requests.exceptions.HTTPError
 
     except requests.exceptions.ConnectTimeout as content:
 
         # connect timeout occurred
-        app_log.warning(u"Connection timed for URL %s with error %s" % (url, content))
-        return 1, content
+        app_logger_instance.warning(u"Connection timed for URL %s with error %s" % (url, content))
+        return 1, status_code, content
 
     except requests.exceptions.ConnectionError as content:
 
         # connection error occurred
-        app_log.warning(u"Connection error for URL %s with error %s" % (url, content))
-        return 1, content
+        app_logger_instance.warning(u"Connection error for URL %s with error %s" % (url, content))
+        return 1, status_code, content
 
     except requests.exceptions.TooManyRedirects as content:
 
         # too many redirects, bad site or circular redirect
-        app_log.warning(u"Too many retries for URL %s with error %s" % (url, content))
-        return 1, content
+        app_logger_instance.warning(u"Too many retries for URL %s with error %s" % (url, content))
+        return 1, status_code, content
 
     except requests.exceptions.HTTPError:
 
         # catch http exceptions thrown by requests
-        return 1, content
+        return 1, status_code, content
 
     except requests.exceptions.RequestException as content:
 
         # catch any other exceptions thrown by requests
-        app_log.warning(u"Caught other exceptions for URL %s with error %s" % (url, content))
-        return 1, content
+        app_logger_instance.warning(u"Caught other exceptions for URL %s with error %s" % (url, content))
+        return 1, status_code, content
 
     else:
 
-        # if status code is not 200 and not 404 (file not found) then raise exception to cause backoff
-        if status_code == 200:
+        if 200 <= status_code <= 299:
 
-            app_log.info(u"The status code %s indicates a successful operation for %s" % (status_code, url))
-            return 0, content
-
-        # if status code is not 200 or 201 and not 404 (file not found) then raise exception to cause backoff
-        elif status_code == 201:
-
-            app_log.info(u"The status code %s indicates a successful creation of a github release for %s" % (status_code, url))
-            return 0, content
+            app_logger_instance.info(u"The status code %s indicates a successful request for %s" % (status_code, url))
+            return 0, status_code, content
 
 
 def github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token):
 
-    app_log.info(u"Creating Release on GitHub for version %s..." % current_version)
+    app_logger_instance.info(u"Creating Release on GitHub for version %s..." % current_version)
 
     target_repo_owner = target_repo_owner
     target_repo_name = target_repo_name
@@ -324,8 +326,8 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     data_payload = '{"tag_name": "%s","target_commitish": "master","name": "%s","body": "%s","draft": false,"prerelease": false}' % (github_tag_name, github_release_name, github_release_body)
 
     # process post request
-    status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, request_type=request_type, data_payload=data_payload)
-    return status_code, content
+    return_code, status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, request_type=request_type, data_payload=data_payload)
+    return return_code, status_code, content
 
 
 def monitor_sites(schedule_check_mins):
@@ -342,9 +344,10 @@ def monitor_sites(schedule_check_mins):
         source_app_name = site_item["source_app_name"]
         source_repo_name = site_item["source_repo_name"]
         target_repo_name = site_item["target_repo_name"]
+        action = site_item["action"]
 
-        app_log.info(u"-------------------------------------")
-        app_log.info(u"Processing started for application %s..." % source_app_name)
+        app_logger_instance.info(u"-------------------------------------")
+        app_logger_instance.info(u"Processing started for application %s..." % source_app_name)
 
         if source_site_name == "github":
 
@@ -353,15 +356,15 @@ def monitor_sites(schedule_check_mins):
             request_type = "get"
 
             # download webpage content
-            status_code, content = http_client(url=url, auth=('binhex', target_access_token), user_agent=user_agent_chrome, request_type=request_type)
+            return_code, status_code, content = http_client(url=url, auth=('binhex', target_access_token), user_agent=user_agent_chrome, request_type=request_type)
 
-            if status_code == 0:
+            if return_code == 0:
 
                 content = json.loads(content)
 
             else:
 
-                app_log.info(u"[ERROR] Problem downloading app info, skipping to new release...")
+                app_logger_instance.info(u"[ERROR] Problem downloading json content from %s, skipping to new release..." % url)
                 continue
 
             try:
@@ -371,7 +374,10 @@ def monitor_sites(schedule_check_mins):
 
             except IndexError:
 
-                current_version = "0.0"
+                app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                continue
+
+            source_site_url = "https://github.com/%s/%s/releases" % (source_repo_name, source_app_name)
 
         elif source_site_name == "aor":
 
@@ -380,15 +386,15 @@ def monitor_sites(schedule_check_mins):
             request_type = "get"
 
             # download webpage content
-            status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+            return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
 
-            if status_code == 0:
+            if return_code == 0:
 
                 content = json.loads(content)
 
             else:
 
-                app_log.info(u"[ERROR] Problem downloading app info, skipping to new release...")
+                app_logger_instance.info(u"[ERROR] Problem downloading json content from %s, skipping to new release..." % url)
                 continue
 
             try:
@@ -400,11 +406,16 @@ def monitor_sites(schedule_check_mins):
                 # construct app version
                 current_version = "%s-%s" % (pkgver, pkgrel)
 
-                last_update = content['results'][0]['last_update']
+                # get repo name and arch type (used in url construct for email notification)
+                source_repo_name = content['results'][0]['repo']
+                source_arch_name = content['results'][0]['arch']
 
             except IndexError:
 
-                current_version = "0.0"
+                app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                continue
+
+            source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
 
         elif source_site_name == "aur":
 
@@ -413,15 +424,15 @@ def monitor_sites(schedule_check_mins):
             request_type = "get"
 
             # download webpage content
-            status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+            return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
 
-            if status_code == 0:
+            if return_code == 0:
 
                 content = json.loads(content)
 
             else:
 
-                app_log.info(u"[ERROR] Problem downloading app info, skipping to new release...")
+                app_logger_instance.info(u"[ERROR] Problem downloading json content from %s, skipping to new release..." % url)
                 continue
 
             try:
@@ -431,7 +442,15 @@ def monitor_sites(schedule_check_mins):
 
             except IndexError:
 
-                current_version = "0.0"
+                app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                continue
+
+            source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
+
+        else:
+
+            app_logger_instance.info(u"[ERROR] Source site name %s unknown, skipping to next iteration..." % source_site_name)
+            continue
 
         # write value for current match to config
         config_obj["results"]["%s_%s_%s_current_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
@@ -444,45 +463,51 @@ def monitor_sites(schedule_check_mins):
 
         except KeyError:
 
-            app_log.info(u"No known previous version for app %s, assuming first run" % source_app_name)
-            app_log.info(u"Setting previous version to current version %s and going to next iteration" % current_version)
+            app_logger_instance.info(u"No known previous version for app %s, assuming first run" % source_app_name)
+            app_logger_instance.info(u"Setting previous version to current version %s and going to next iteration" % current_version)
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
             continue
 
         if previous_version != current_version:
 
-            app_log.info(u"[TRIGGER] Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
-            status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
+            app_logger_instance.info(u"[TRIGGER] Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
+            return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
 
-            if status_code == 0:
+            if status_code == 201:
 
-                app_log.info(u"Setting previous version %s to the same as current version %s after successful build" % (previous_version, current_version))
+                app_logger_instance.info(u"Setting previous version %s to the same as current version %s after successful build" % (previous_version, current_version))
                 config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
                 config_obj.write()
 
                 # send email notification
-                notification_email(source_app_name, source_repo_name, target_repo_name, previous_version, current_version)
+                notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
+
+            elif status_code == 422:
+
+                app_logger_instance.warning(u"[ERROR] github release already exists for %s/%s, skipping build" % (target_repo_owner, target_repo_name))
+                config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
+                config_obj.write()
 
             else:
 
-                app_log.warning(u"[ERROR] Problem creating github release and tag, skipping to next iteration...")
+                app_logger_instance.warning(u"[ERROR] Problem creating github release and tag, skipping to next iteration...")
                 continue
 
         else:
 
-            app_log.info(u"[SKIPPED] Previous version %s and current version %s match, nothing to do" % (previous_version, current_version))
+            app_logger_instance.info(u"[SKIPPED] Previous version %s and current version %s match, nothing to do" % (previous_version, current_version))
 
-        app_log.info(u"Processing finished for application %s" % source_app_name)
+        app_logger_instance.info(u"Processing finished for application %s" % source_app_name)
 
-    app_log.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
+    app_logger_instance.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
 
 
 def start():
 
     schedule_check_mins = config_obj["general"]["schedule_check_mins"]
 
-    app_log.info(u"Initial check for version changes...")
+    app_logger_instance.info(u"Initial check for version changes...")
     monitor_sites(schedule_check_mins)
 
     # now run monitor_sites function via scheduler
@@ -497,7 +522,7 @@ def start():
 
         except KeyboardInterrupt:
 
-            app_log.info(u"Keyboard interrupt received, exiting script...")
+            app_logger_instance.info(u"Keyboard interrupt received, exiting script...")
             sys.exit()
 
 # required to prevent separate process from trying to load parent process
@@ -505,6 +530,8 @@ if __name__ == '__main__':
 
     version = "1.0.0"
     app_log = app_logging()
+    app_logger_instance = app_log.get('logger')
+    app_handler = app_log.get('handler')
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
@@ -530,12 +557,34 @@ if __name__ == '__main__':
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
 
-        app_log.info(u"Running as a daemonized process...")
-        with daemon.DaemonContext():
+        app_logger_instance.info(u"Running as a daemonized process...")
 
-            start()
+        # specify the logging handler as an exclusion to the daemon, to prevent its output being closed
+        daemon_context = daemon.DaemonContext()
+        daemon_context.files_preserve = [app_handler.stream]
+        daemon_context.open()
+
+        schedule_check_mins = config_obj["general"]["schedule_check_mins"]
+
+        app_logger_instance.info(u"Initial check for version changes...")
+        monitor_sites(schedule_check_mins)
+
+        # now run monitor_sites function via scheduler
+        schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
+
+        while True:
+
+            try:
+
+                schedule.run_pending()
+                time.sleep(1)
+
+            except KeyboardInterrupt:
+
+                app_logger_instance.info(u"Keyboard interrupt received, exiting script...")
+                sys.exit()
 
     else:
 
-            app_log.info(u"Running as a foreground process...")
+            app_logger_instance.info(u"Running as a foreground process...")
             start()
