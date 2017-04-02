@@ -20,6 +20,7 @@ signal.signal(signal.SIGINT, signal.default_int_handler) # ensure we correctly h
 # TODO change input to functions as dictionary
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
 # TODO change return for function to dictionary
+# TODO rework configspec, very out of date
 
 dht_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
 
@@ -471,28 +472,33 @@ def monitor_sites(schedule_check_mins):
 
         if previous_version != current_version:
 
-            app_logger_instance.info(u"[TRIGGER] Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
-            return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
+            if action == "trigger":
 
-            if status_code == 201:
+                app_logger_instance.info(u"[TRIGGER] Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
+                return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
 
-                app_logger_instance.info(u"Setting previous version %s to the same as current version %s after successful build" % (previous_version, current_version))
-                config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
-                config_obj.write()
+                if status_code == 201:
 
-                # send email notification
-                notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
+                    app_logger_instance.info(u"Setting previous version %s to the same as current version %s after successful build" % (previous_version, current_version))
 
-            elif status_code == 422:
+                elif status_code == 422:
 
-                app_logger_instance.warning(u"[ERROR] github release already exists for %s/%s, skipping build" % (target_repo_owner, target_repo_name))
-                config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
-                config_obj.write()
+                    app_logger_instance.warning(u"[ERROR] github release already exists for %s/%s, skipping build" % (target_repo_owner, target_repo_name))
 
-            else:
+                else:
 
-                app_logger_instance.warning(u"[ERROR] Problem creating github release and tag, skipping to next iteration...")
-                continue
+                    app_logger_instance.warning(u"[ERROR] Problem creating github release and tag, skipping to next iteration...")
+                    continue
+
+            elif action == "notify":
+
+                app_logger_instance.info(u"[NOTIFY] Previous version %s and current version %s are different, sending email notification..." % (previous_version, current_version))
+
+            config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
+            config_obj.write()
+
+            # send email notification
+            notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
 
         else:
 
