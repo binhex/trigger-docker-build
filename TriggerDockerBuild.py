@@ -14,6 +14,7 @@ import time
 import daemon
 import requests.packages.urllib3
 import signal
+import kodijson
 requests.packages.urllib3.disable_warnings() # required to suppress ssl warning for urllib3 (requests uses urllib3)
 signal.signal(signal.SIGINT, signal.default_int_handler) # ensure we correctly handle all keyboard interrupts
 
@@ -127,19 +128,34 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
     <b>Source Site Name:</b> %s<br>
     <b>Source Repository:</b> %s<br>
     <b>Source App Name:</b> %s<br>
-    <b>Source Site URL:</b> %s<br>
+    <b>Source Site URL:</b>  <a href="%s">%s</a><br>
     <b>Target Repository:</b> %s<br>
-    ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, target_repo_name)
+    ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name, target_repo_name)
 
     if action == "trigger":
 
-        html += '''<b>Target Build URL:</b> %s<br>''' % dockerhub_build_details
+        html += '''<b>Target Build URL:</b> <a href="%s">dockerhub</a><br>''' % dockerhub_build_details
 
     yag.send(to = config_email_to, subject = subject, contents = [html])
 
 
-@backoff.on_exception(backoff.expo, (socket.timeout, requests.exceptions.Timeout, requests.exceptions.HTTPError),
-                      max_tries=10)
+# noinspection PyUnresolvedReferences
+def notification_kodi(action, source_app_name, current_version):
+
+    # read kodi config
+    kodi_username = config_obj["notification"]["kodi_username"]
+    kodi_password = config_obj["notification"]["kodi_password"]
+    kodi_hostname = config_obj["notification"]["kodi_hostname"]
+    kodi_port = config_obj["notification"]["kodi_port"]
+
+    # Login with custom credentials
+    kodi = kodijson.Kodi("http://%s:%s/jsonrpc" % (kodi_hostname, kodi_port), kodi_username, kodi_password)
+
+    # send gui notification
+    kodi.GUI.ShowNotification({"title": "Action: %s" % action, "message": "App: %s - %s" % (source_app_name, current_version)})
+
+
+@backoff.on_exception(backoff.expo, (socket.timeout, requests.exceptions.Timeout, requests.exceptions.HTTPError), max_tries=10)
 def http_client(**kwargs):
 
     if kwargs is not None:
@@ -200,8 +216,6 @@ def http_client(**kwargs):
 
         app_logger_instance.warning(u'No keyword args sent to function, exiting function...')
         return 1
-
-    # add headers for gzip support and custom user agent string
 
     # set connection timeout value (max time to wait for connection)
     connect_timeout = 10.0
@@ -492,13 +506,18 @@ def monitor_sites(schedule_check_mins):
 
             elif action == "notify":
 
-                app_logger_instance.info(u"[NOTIFY] Previous version %s and current version %s are different, sending email notification..." % (previous_version, current_version))
+                app_logger_instance.info(u"[NOTIFY] Previous version %s and current version %s are different" % (previous_version, current_version))
 
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
 
             # send email notification
+            app_logger_instance.info(u"[NFO] Sending email notification...")
             notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
+
+            # send kodi notification
+            app_logger_instance.info(u"[NFO] Sending kodi notification...")
+            notification_kodi(action, source_app_name, current_version)
 
         else:
 
