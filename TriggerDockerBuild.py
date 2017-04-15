@@ -120,7 +120,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
     app_logger_instance.info(u'Sending email notification...')
 
     yag = yagmail.SMTP(config_email_username, config_email_password)
-    subject = '[%s] %s - version changed from %s to %s' % (source_app_name, action, previous_version, current_version)
+    subject = '%s [%s] - version updated to %s' % (source_app_name, action, current_version)
     html = '''
     <b>Action:</b> %s<br>
     <b>Previous Version:</b> %s<br>
@@ -152,7 +152,7 @@ def notification_kodi(action, source_app_name, current_version):
     kodi = kodijson.Kodi("http://%s:%s/jsonrpc" % (kodi_hostname, kodi_port), kodi_username, kodi_password)
 
     # send gui notification
-    kodi.GUI.ShowNotification({"title": "Action: %s" % action, "message": "App: %s - %s" % (source_app_name, current_version)})
+    kodi.GUI.ShowNotification({"title": "TriggerDockerBuild", "message": "%s [%s] - version updated to %s" % (source_app_name, action, current_version)})
 
 
 @backoff.on_exception(backoff.expo, (socket.timeout, requests.exceptions.Timeout, requests.exceptions.HTTPError), max_tries=10)
@@ -397,7 +397,7 @@ def monitor_sites(schedule_check_mins):
         elif source_site_name == "aor":
 
             # use aor unofficial api to get app release info
-            url = "https://www.archlinux.org/packages/search/json/?q=%s&arch=any&arch=x86_64" % source_app_name
+            url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
             request_type = "get"
 
             # download webpage content
