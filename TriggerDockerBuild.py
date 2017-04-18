@@ -550,6 +550,7 @@ def start():
             app_logger_instance.info(u"Keyboard interrupt received, exiting script...")
             sys.exit()
 
+
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
@@ -589,27 +590,9 @@ if __name__ == '__main__':
         daemon_context.files_preserve = [app_handler.stream]
         daemon_context.open()
 
-        schedule_check_mins = config_obj["general"]["schedule_check_mins"]
-
-        app_logger_instance.info(u"Initial check for version changes...")
-        monitor_sites(schedule_check_mins)
-
-        # now run monitor_sites function via scheduler
-        schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
-
-        while True:
-
-            try:
-
-                schedule.run_pending()
-                time.sleep(1)
-
-            except KeyboardInterrupt:
-
-                app_logger_instance.info(u"Keyboard interrupt received, exiting script...")
-                sys.exit()
-
     else:
 
-            app_logger_instance.info(u"Running as a foreground process...")
-            start()
+        app_logger_instance.info(u"Running as a foreground process...")
+
+    # run main function
+    start()
