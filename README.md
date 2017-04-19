@@ -18,7 +18,7 @@ TBA
 **Linux Installation:**
 - Install Python 2.7.x
 - Download the zipped source from https://github.com/binhex/trigger-docker-build/archive/master.zip
-- Unpack the zipped sounrce
+- Unpack the zipped source
 
 **Configuration:**
 ```

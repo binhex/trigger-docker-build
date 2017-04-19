@@ -16,8 +16,8 @@ import daemon
 import requests.packages.urllib3
 import signal
 import kodijson
-requests.packages.urllib3.disable_warnings() # required to suppress ssl warning for urllib3 (requests uses urllib3)
-signal.signal(signal.SIGINT, signal.default_int_handler) # ensure we correctly handle all keyboard interrupts
+requests.packages.urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
+signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly handle all keyboard interrupts
 
 # TODO change input to functions as dictionary
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
@@ -88,7 +88,7 @@ def app_logging():
 
         console_streamhandler.setLevel(logging.ERROR)
 
-    return {'logger':app_logger, 'handler':app_rotatingfilehandler}
+    return {'logger': app_logger, 'handler': app_rotatingfilehandler}
 
 
 def notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version):
@@ -121,7 +121,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
         html += '''<b>Target Build URL:</b> <a href="%s">dockerhub</a><br>''' % dockerhub_build_details
 
-    yag.send(to = config_email_to, subject = subject, contents = [html])
+    yag.send(to=config_email_to, subject=subject, contents=[html])
 
 
 # noinspection PyUnresolvedReferences
@@ -513,7 +513,7 @@ def monitor_sites(schedule_check_mins):
     app_logger_instance.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
 
 
-def start():
+def scheduler_start():
 
     schedule_check_mins = config_obj["general"]["schedule_check_mins"]
 
@@ -539,10 +539,10 @@ def start():
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
-    dht_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
+    app_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
 
     # set folder path for config files
-    config_dir = os.path.join(dht_root_dir, u"configs")
+    config_dir = os.path.join(app_root_dir, u"configs")
     config_dir = os.path.normpath(config_dir)
 
     # set path for configspec.ini file
@@ -552,7 +552,7 @@ if __name__ == '__main__':
     config_ini = os.path.join(config_dir, u"config.ini")
 
     # set folder path for log files
-    logs_dir = os.path.join(dht_root_dir, u"logs")
+    logs_dir = os.path.join(app_root_dir, u"logs")
     logs_dir = os.path.normpath(logs_dir)
 
     # set path for log file
@@ -607,4 +607,4 @@ if __name__ == '__main__':
         app_logger_instance.info(u"Running as a foreground process...")
 
     # run main function
-    start()
+    scheduler_start()
