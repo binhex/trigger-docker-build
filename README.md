@@ -6,8 +6,11 @@ A Python script to monitor GitHub, Arch Repository and Arch User Repository for 
 
 **Features:**
 - GitHub monitoring
-- Arch Repository monitoring
+- Arch Official Repository (AOR) monitoring
 - Arch User Repository (AUR) monitoring
+- Support for trigger or notify actions
+- Email notification
+- Kodi notification
 
 **Windows Installation:**
 TBA
@@ -17,6 +20,11 @@ TBA
 - Download the zipped source from https://github.com/binhex/trigger-docker-build/archive/master.zip
 - Unpack the zipped sounrce
 
+**Configuration:**
+```
+site_list = [{'source_site_name': '<github|aor|aur>', 'source_repo_name': '<repo_name>', 'source_app_name': '<app_name>', 'target_repo_name': '<repo_name>', 'action': '<notify|trigger>'}]
+```
+
 **Usage:**
 ```
 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --daemon
@@ -24,9 +32,6 @@ TBA
 
 **Future:**
 - Use Beautiful Soup to also web scrape for non API sites.
-- Monitor Docker Hub "Build Details" for success/failure.
-- Add in action of notify or trigger for version changes.
-- Send Kodi notification.
 
 **Known Issues:**
 - TBA

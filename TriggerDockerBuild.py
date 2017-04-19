@@ -1,5 +1,6 @@
 import requests
 import configobj
+import validate
 import argparse
 import os
 import sys
@@ -23,29 +24,13 @@ signal.signal(signal.SIGINT, signal.default_int_handler) # ensure we correctly h
 # TODO change return for function to dictionary
 # TODO rework configspec, very out of date
 
-dht_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
 
-# set folder path for config files
-config_dir = os.path.join(dht_root_dir, u"configs")
-config_dir = os.path.normpath(config_dir)
+def create_config():
 
-# set path for configspec.ini file
-configspec_ini = os.path.join(config_dir, u"configspec.ini")
-
-# set path for config.ini file
-config_ini = os.path.join(config_dir, u"config.ini")
-
-# set folder path for log files
-logs_dir = os.path.join(dht_root_dir, u"logs")
-logs_dir = os.path.normpath(logs_dir)
-
-# set path for log file
-app_log_file = os.path.join(logs_dir, u"app.log")
-
-# create configobj instance, set config.ini file, set encoding and set configspec.ini file
-config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
-
-user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
+    validator = validate.Validator()
+    config_obj.validate(validator, copy=True)
+    config_obj.filename = config_ini
+    config_obj.write()
 
 
 def app_logging():
@@ -553,6 +538,33 @@ def start():
 
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
+
+    dht_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
+
+    # set folder path for config files
+    config_dir = os.path.join(dht_root_dir, u"configs")
+    config_dir = os.path.normpath(config_dir)
+
+    # set path for configspec.ini file
+    configspec_ini = os.path.join(config_dir, u"configspec.ini")
+
+    # set path for config.ini file
+    config_ini = os.path.join(config_dir, u"config.ini")
+
+    # set folder path for log files
+    logs_dir = os.path.join(dht_root_dir, u"logs")
+    logs_dir = os.path.normpath(logs_dir)
+
+    # set path for log file
+    app_log_file = os.path.join(logs_dir, u"app.log")
+
+    # create configobj instance, set config.ini file, set encoding and set configspec.ini file
+    config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
+
+    # create config.ini
+    create_config()
+
+    user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
 
     version = "1.0.0"
     app_log = app_logging()
