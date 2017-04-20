@@ -360,7 +360,14 @@ def monitor_sites(schedule_check_mins):
 
             if return_code == 0:
 
-                content = json.loads(content)
+                try:
+
+                    content = json.loads(content)
+
+                except (ValueError, TypeError, KeyError):
+
+                    app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
+                    continue
 
             else:
 
@@ -390,7 +397,14 @@ def monitor_sites(schedule_check_mins):
 
             if return_code == 0:
 
-                content = json.loads(content)
+                try:
+
+                    content = json.loads(content)
+
+                except (ValueError, TypeError, KeyError):
+
+                    app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
+                    continue
 
             else:
 
@@ -428,7 +442,14 @@ def monitor_sites(schedule_check_mins):
 
             if return_code == 0:
 
-                content = json.loads(content)
+                try:
+
+                    content = json.loads(content)
+
+                except (ValueError, TypeError, KeyError):
+
+                    app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
+                    continue
 
             else:
 
