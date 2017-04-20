@@ -512,6 +512,10 @@ def monitor_sites(schedule_check_mins):
 
     app_logger_instance.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
 
+    # write timestamp to config.ini
+    config_obj["general"]["last_check"] = time.strftime("%c")
+    config_obj.write()
+
 
 def scheduler_start():
 
@@ -519,9 +523,6 @@ def scheduler_start():
 
     app_logger_instance.info(u"Initial check for version changes...")
     monitor_sites(schedule_check_mins)
-
-    config_obj["general"]["last_check"] = time.strftime("%c")
-    config_obj.write()
 
     # now run monitor_sites function via scheduler
     schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
@@ -531,9 +532,6 @@ def scheduler_start():
         try:
 
             schedule.run_pending()
-            config_obj["general"]["last_check"] = time.strftime("%c")
-            config_obj.write()
-
             time.sleep(1)
 
         except KeyboardInterrupt:
