@@ -351,8 +351,19 @@ def monitor_sites(schedule_check_mins):
 
         if source_site_name == "github":
 
+            # github api sorting issues for "tag" releases for certain repos, switch to use "releases" for these
+            if source_app_name.lower() == "medusa" or source_app_name.lower() == "docker":
+
+                github_query_type = "releases"
+                json_query = "tag_name"
+
+            else:
+
+                github_query_type = "tags"
+                json_query = "name"
+
             # use github rest api to get app release info
-            url = "https://api.github.com/repos/%s/%s/tags" % (source_repo_name, source_app_name)
+            url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
             request_type = "get"
 
             # download webpage content
@@ -376,8 +387,8 @@ def monitor_sites(schedule_check_mins):
 
             try:
 
-                # get tag name from json
-                current_version = content[0]['name']
+                # get version from json
+                current_version = content[0]['%s' % json_query]
 
             except IndexError:
 
