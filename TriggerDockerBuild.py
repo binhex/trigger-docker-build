@@ -137,7 +137,7 @@ def notification_kodi(action, source_app_name, current_version):
     kodi = kodijson.Kodi("http://%s:%s/jsonrpc" % (kodi_hostname, kodi_port), kodi_username, kodi_password)
 
     # send gui notification
-    kodi.GUI.ShowNotification({"title": "TriggerDockerBuild", "message": "%s [%s] - version updated to %s" % (source_app_name, action, current_version)})
+    kodi.GUI.ShowNotification({"title": "TriggerDockerBuild", "message": "%s [%s] - updated to %s" % (source_app_name, action, current_version)})
 
 
 @backoff.on_exception(backoff.expo, (socket.timeout, requests.exceptions.Timeout, requests.exceptions.HTTPError), max_tries=10)
