@@ -23,6 +23,7 @@ signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly 
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
 # TODO change return for function to dictionary
 # TODO rework configspec, very out of date
+# TODO put in grace_period for AOR (definable in config) as AOR uploads osmetimes arent present on mirrors straight away
 
 
 def create_config():
@@ -105,7 +106,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
     app_logger_instance.info(u'Sending email notification...')
 
     yag = yagmail.SMTP(config_email_username, config_email_password)
-    subject = '%s [%s] - version updated to %s' % (source_app_name, action, current_version)
+    subject = '%s [%s] - updated to %s' % (source_app_name, action, current_version)
     html = '''
     <b>Action:</b> %s<br>
     <b>Previous Version:</b> %s<br>
@@ -410,9 +411,13 @@ def monitor_sites(schedule_check_mins):
 
                 try:
 
+                    # decode json
                     content = json.loads(content)
 
-                except (ValueError, TypeError, KeyError):
+                    # filter python objects with list comprehension to prevent fuzzy mismatch
+                    content = [x for x in content['results'] if x['pkgname'] == source_app_name]
+
+                except (ValueError, TypeError, KeyError, IndexError):
 
                     app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
                     continue
@@ -425,17 +430,21 @@ def monitor_sites(schedule_check_mins):
             try:
 
                 # get package version and release number from json
-                pkgver = content['results'][0]['pkgver']
-                pkgrel = content['results'][0]['pkgrel']
+                pkgver = content[0]['pkgver']
+                pkgrel = content[0]['pkgrel']
 
                 # construct app version
                 current_version = "%s-%s" % (pkgver, pkgrel)
 
                 # get repo name and arch type (used in url construct for email notification)
-                source_repo_name = content['results'][0]['repo']
-                source_arch_name = content['results'][0]['arch']
+                source_repo_name = content[0]['repo']
+                source_arch_name = content[0]['arch']
 
-            except IndexError:
+                # get last update date and time (used for grace_period)
+                last_update = content[0]['last_update']
+                print last_update
+
+            except (ValueError, TypeError, KeyError, IndexError):
 
                 app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
                 continue
