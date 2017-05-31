@@ -16,14 +16,15 @@ import daemon
 import requests.packages.urllib3
 import signal
 import kodijson
+import datetime
+import pytz
+
 requests.packages.urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
 signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly handle all keyboard interrupts
 
 # TODO change input to functions as dictionary
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
 # TODO change return for function to dictionary
-# TODO rework configspec, very out of date
-# TODO put in grace_period for AOR (definable in config) as AOR uploads osmetimes arent present on mirrors straight away
 
 
 def create_config():
@@ -32,6 +33,38 @@ def create_config():
     config_obj.validate(validator, copy=True)
     config_obj.filename = config_ini
     config_obj.write()
+
+
+def time_check(grace_period, last_update):
+
+    # get current local time in utc
+    local_time_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+
+    # conert local time into secs
+    local_time_secs = time.mktime(local_time_utc.timetuple())
+
+    # convert last_update time to time object
+    last_update_time = datetime.datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+    # conert last update time into secs
+    last_update_time_secs = time.mktime(last_update_time.timetuple())
+
+    # compare difference between last_update time and local time
+    time_delta_secs = local_time_secs - last_update_time_secs
+    time_delta_mins = int(time_delta_secs) / 60
+
+    app_logger_instance.info(u"Time since last update is %s minutes" % time_delta_mins)
+
+    # check if time_delta is greater than or equal to grace_period
+    if time_delta_mins >= grace_period:
+
+        app_logger_instance.info(u"Time since last update is >= to grace period")
+        return True
+
+    else:
+
+        app_logger_instance.info(u"Time since last update is < grace period")
+        return False
 
 
 def app_logging():
@@ -400,6 +433,9 @@ def monitor_sites(schedule_check_mins):
 
         elif source_site_name == "aor":
 
+            # get grace period from config (in minutes), required for mirrors to replicate releases for aor
+            grace_period = config_obj["general"]["grace_period"]
+
             # use aor unofficial api to get app release info
             url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
             request_type = "get"
@@ -440,13 +476,17 @@ def monitor_sites(schedule_check_mins):
                 source_repo_name = content[0]['repo']
                 source_arch_name = content[0]['arch']
 
-                # get last update date and time (used for grace_period)
+                # get last update date and time (used for grace_period) example output 2017-05-27T08:55:00.294Z
                 last_update = content[0]['last_update']
-                print last_update
 
             except (ValueError, TypeError, KeyError, IndexError):
 
                 app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                continue
+
+            # run function to check if time since last update is greater than or equal to grace period
+            if not time_check(grace_period, last_update):
+
                 continue
 
             source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)

@@ -3,6 +3,7 @@ BeautifulSoup==3.2.1
 configobj==5.0.6
 kodi-json==1.0.0
 python-daemon==2.1.2
+pytz==2017.2
 requests==2.13.0
 schedule==0.4.2
 six==1.10.0
