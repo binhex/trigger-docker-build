@@ -37,16 +37,24 @@ def create_config():
 
 def time_check(grace_period, last_update):
 
-    # get current local time in utc
-    local_time_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+    # define local time zone
+    local_time_zone = "Europe/London"
 
-    # conert local time into secs
+    # get current local time and set timezone to gmt
+    local_time_gmt = datetime.datetime.now(pytz.timezone(local_time_zone))
+    app_logger_instance.debug(u"Local time as time object for time zone %s is %s" % (local_time_zone, local_time_gmt))
+
+    # convert local time gmt to utc
+    local_time_utc = local_time_gmt.astimezone(pytz.timezone('UTC'))
+    app_logger_instance.debug(u"Local time converted to UTC is %s" % local_time_utc)
+
+    # convert local time into secs
     local_time_secs = time.mktime(local_time_utc.timetuple())
 
     # convert last_update time to time object
     last_update_time = datetime.datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%S.%fZ")
 
-    # conert last update time into secs
+    # convert last update time into secs
     last_update_time_secs = time.mktime(last_update_time.timetuple())
 
     # compare difference between last_update time and local time
