@@ -48,17 +48,15 @@ def time_check(grace_period, last_update):
     local_time_utc = local_time_gmt.astimezone(pytz.timezone('UTC'))
     app_logger_instance.debug(u"Local time converted to UTC is %s" % local_time_utc)
 
-    # convert local time into secs
-    local_time_secs = time.mktime(local_time_utc.timetuple())
-
     # convert last_update time to time object
     last_update_time = datetime.datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%S.%fZ")
 
-    # convert last update time into secs
-    last_update_time_secs = time.mktime(last_update_time.timetuple())
+    # compare difference between local date/time and last update date/time to produce timedelta
+    time_delta = local_time_utc - last_update_time
+    app_logger_instance.debug(u"Time delta object is %s" % time_delta)
 
-    # compare difference between last_update time and local time
-    time_delta_secs = local_time_secs - last_update_time_secs
+    # turn timedelta object into minutes
+    time_delta_secs = time_delta.total_seconds()
     time_delta_mins = int(time_delta_secs) / 60
 
     app_logger_instance.info(u"Time since last update is %s minutes" % time_delta_mins)
