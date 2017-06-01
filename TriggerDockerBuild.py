@@ -50,13 +50,14 @@ def time_check(grace_period, last_update):
 
     # convert last_update time to time object
     last_update_time = datetime.datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%S.%fZ")
+    last_update_time_utc = pytz.utc.localize(last_update_time)
 
     # compare difference between local date/time and last update date/time to produce timedelta
-    time_delta = local_time_utc - last_update_time
+    time_delta = local_time_utc - last_update_time_utc
     app_logger_instance.debug(u"Time delta object is %s" % time_delta)
 
     # turn timedelta object into minutes
-    time_delta_secs = time_delta.total_seconds()
+    time_delta_secs = datetime.timedelta.total_seconds(time_delta)
     time_delta_mins = int(time_delta_secs) / 60
 
     app_logger_instance.info(u"Time since last update is %s minutes" % time_delta_mins)
