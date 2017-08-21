@@ -174,11 +174,18 @@ def notification_kodi(action, source_app_name, current_version):
     kodi_hostname = config_obj["notification"]["kodi_hostname"]
     kodi_port = config_obj["notification"]["kodi_port"]
 
-    # Login with custom credentials
+    # construct login with custom credentials for rpc call
     kodi = kodijson.Kodi("http://%s:%s/jsonrpc" % (kodi_hostname, kodi_port), kodi_username, kodi_password)
 
     # send gui notification
-    kodi.GUI.ShowNotification({"title": "TriggerDockerBuild", "message": "%s [%s] - updated to %s" % (source_app_name, action, current_version)})
+    try:
+
+        kodi.GUI.ShowNotification({"title": "TriggerDockerBuild", "message": "%s [%s] - updated to %s" % (source_app_name, action, current_version)})
+
+    except Exception:
+
+        app_logger_instance.warning(u"Failed to send notification to Kodi instance at http://%s:%s/jsonrpc" % (kodi_hostname, kodi_port))
+        return 1
 
 
 @backoff.on_exception(backoff.expo, (socket.timeout, requests.exceptions.Timeout, requests.exceptions.HTTPError), max_tries=10)
