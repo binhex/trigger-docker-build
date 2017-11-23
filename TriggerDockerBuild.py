@@ -162,8 +162,14 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
         html += '''<b>Target Build URL:</b> <a href="%s">dockerhub</a><br>''' % dockerhub_build_details
 
-    yag.send(to=config_email_to, subject=subject, contents=[html])
+    try:
 
+        yag.send(to=config_email_to, subject=subject, contents=[html])
+
+    except Exception:
+
+        app_logger_instance.warning(u"Failed to send E-Mail notification to %s" % config_email_to)
+        return 1
 
 # noinspection PyUnresolvedReferences
 def notification_kodi(action, source_app_name, current_version):
