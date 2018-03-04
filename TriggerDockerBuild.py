@@ -4,6 +4,7 @@ import validate
 import argparse
 import os
 import sys
+import re
 import socket
 import logging
 import logging.handlers
@@ -170,6 +171,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
         app_logger_instance.warning(u"Failed to send E-Mail notification to %s" % config_email_to)
         return 1
+
 
 # noinspection PyUnresolvedReferences
 def notification_kodi(action, source_app_name, current_version):
@@ -366,6 +368,9 @@ def http_client(**kwargs):
 
 
 def github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token):
+
+    # remove illegal characters from version (github does not allow certain chars for release name)
+    current_version = re.sub(ur":", ur".", current_version, flags=re.IGNORECASE)
 
     app_logger_instance.info(u"Creating Release on GitHub for version %s..." % current_version)
 
