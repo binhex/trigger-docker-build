@@ -410,8 +410,16 @@ def monitor_sites(schedule_check_mins):
 
         if source_site_name == "github":
 
-            github_query_type = "releases"
-            json_query = "tag_name"
+            # certain github repos do not have releases, only tags, thus we need to account for these differently
+            if source_app_name.lower() == "sickrage":
+
+                github_query_type = "tags"
+                json_query = "name"
+
+            else:
+
+                github_query_type = "releases/latest"
+                json_query = "tag_name"
 
             # use github rest api to get app release info
             url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
@@ -438,8 +446,15 @@ def monitor_sites(schedule_check_mins):
 
             try:
 
-                # get version from json
-                current_version = content[0]['%s' % json_query]
+                if github_query_type == "tags":
+
+                    # get version from json
+                    current_version = content[0]['%s' % json_query]
+
+                else:
+
+                    # get version from json
+                    current_version = content['%s' % json_query]
 
             except IndexError:
 
