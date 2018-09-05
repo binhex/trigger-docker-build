@@ -461,7 +461,7 @@ def monitor_sites(schedule_check_mins):
                 app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
                 continue
 
-            source_site_url = "https://github.com/%s/%s/releases" % (source_repo_name, source_app_name)
+            source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
 
         elif source_site_name == "aor":
 
