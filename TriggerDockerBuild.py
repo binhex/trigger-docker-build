@@ -403,6 +403,7 @@ def monitor_sites(schedule_check_mins):
         source_app_name = site_item["source_app_name"]
         source_repo_name = site_item["source_repo_name"]
         target_repo_name = site_item["target_repo_name"]
+        source_query_type = site_item["source_query_type"]
         action = site_item["action"]
 
         app_logger_instance.info(u"-------------------------------------")
@@ -411,7 +412,7 @@ def monitor_sites(schedule_check_mins):
         if source_site_name == "github":
 
             # certain github repos do not have releases, only tags, thus we need to account for these differently
-            if source_app_name.lower() == "sickrage":
+            if source_query_type.lower() == "tag":
 
                 github_query_type = "tags"
                 json_query = "name"
