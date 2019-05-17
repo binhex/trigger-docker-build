@@ -710,6 +710,13 @@ if __name__ == '__main__':
     # save arguments in dictionary
     args = vars(commandline_parser.parse_args())
 
+    # create config and logs paths if they dont exist
+    if not os.path.exists(args["config"]):
+        os.makedirs(args["config"])
+
+    if not os.path.exists(args["logs"]):
+        os.makedirs(args["logs"])
+
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
 
