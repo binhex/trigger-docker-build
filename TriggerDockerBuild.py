@@ -720,16 +720,16 @@ if __name__ == '__main__':
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir)
 
-    # setup logging
-    app_log = app_logging()
-    app_logger_instance = app_log.get('logger')
-    app_handler = app_log.get('handler')
-
     # create configobj instance, set config.ini file, set encoding and set configspec.ini file
     config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
 
     # create config.ini
     create_config()
+
+    # setup logging
+    app_log = app_logging()
+    app_logger_instance = app_log.get('logger')
+    app_handler = app_log.get('handler')
 
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
