@@ -682,7 +682,11 @@ if __name__ == '__main__':
     # save arguments in dictionary
     args = vars(commandline_parser.parse_args())
 
+    # set path to root folder for application
     app_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
+
+    # set path for configspec.ini file
+    configspec_ini = os.path.join(app_root_dir, u"configspec.ini")
 
     if not args["config"]:
 
@@ -693,9 +697,6 @@ if __name__ == '__main__':
     else:
 
         config_dir = args["config"]
-
-    # set path for configspec.ini file
-    configspec_ini = os.path.join(config_dir, u"configspec.ini")
 
     # set path for config.ini file
     config_ini = os.path.join(config_dir, u"config.ini")
