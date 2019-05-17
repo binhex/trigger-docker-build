@@ -660,9 +660,6 @@ if __name__ == '__main__':
     user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
 
     version = "1.0.0"
-    app_log = app_logging()
-    app_logger_instance = app_log.get('logger')
-    app_handler = app_log.get('handler')
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
@@ -722,6 +719,11 @@ if __name__ == '__main__':
 
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir)
+
+    # setup logging
+    app_log = app_logging()
+    app_logger_instance = app_log.get('logger')
+    app_handler = app_log.get('handler')
 
     # create configobj instance, set config.ini file, set encoding and set configspec.ini file
     config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
