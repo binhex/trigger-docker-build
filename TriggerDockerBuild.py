@@ -686,7 +686,7 @@ if __name__ == '__main__':
     app_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
 
     # set path for configspec.ini file
-    configspec_ini = os.path.join(app_root_dir, u"configspec.ini")
+    configspec_ini = os.path.join(app_root_dir, u"configs/configspec.ini")
 
     if not args["config"]:
 
