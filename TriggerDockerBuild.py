@@ -14,13 +14,14 @@ import yagmail
 import schedule
 import time
 import daemon
-import requests.packages.urllib3
+import urllib3
 import signal
 import kodijson
 import datetime
 import pytz
+from bs4 import BeautifulSoup
 
-requests.packages.urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
+urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
 signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly handle all keyboard interrupts
 
 # TODO change input to functions as dictionary
@@ -561,10 +562,58 @@ def monitor_sites(schedule_check_mins):
 
             source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
 
+        elif source_site_name == "regex":
+
+            if source_app_name == "minecraftbedrock":
+
+                # download webpage
+                url = "https://www.minecraft.net/en-us/download/server/bedrock"
+                request_type = "get"
+
+                # download webpage content
+                return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome,request_type=request_type)
+
+                if return_code == 0:
+
+                    try:
+
+                        soup = BeautifulSoup(content)
+
+                    except (ValueError, TypeError, KeyError):
+
+                        app_logger_instance.info(u"[ERROR] Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
+                        continue
+
+                else:
+
+                    app_logger_instance.info(u"[ERROR] Problem downloading webpage from url  %s, skipping to new release..." % url)
+                    continue
+
+                try:
+
+                    # get download url from soup
+                    url_line = soup.select('a[data-platform="serverBedrockLinux"]')
+                    download_url = url_line[0]['href']
+
+                    # get app version from soup
+                    current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
+
+                except IndexError:
+
+                    app_logger_instance.info(u"[ERROR] Problem parsing webpage from %s, skipping to next iteration..." % url)
+                    continue
+
+            else:
+
+                app_logger_instance.info(u"[ERROR] Source app name %s unknown, skipping to next iteration..." % source_app_name)
+                continue
+
         else:
 
             app_logger_instance.info(u"[ERROR] Source site name %s unknown, skipping to next iteration..." % source_site_name)
             continue
+
+        source_site_url = url
 
         # write value for current match to config
         config_obj["results"]["%s_%s_%s_current_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
