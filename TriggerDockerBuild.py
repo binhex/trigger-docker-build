@@ -598,6 +598,9 @@ def monitor_sites(schedule_check_mins):
                     # get app version from soup
                     current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
 
+                    # set source site url (used for email notification link) to the same as url used to webscrape (same for this site)
+                    source_site_url = url
+
                 except IndexError:
 
                     app_logger_instance.info(u"[ERROR] Problem parsing webpage from %s, skipping to next iteration..." % url)
@@ -612,8 +615,6 @@ def monitor_sites(schedule_check_mins):
 
             app_logger_instance.info(u"[ERROR] Source site name %s unknown, skipping to next iteration..." % source_site_name)
             continue
-
-        source_site_url = url
 
         # write value for current match to config
         config_obj["results"]["%s_%s_%s_current_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
