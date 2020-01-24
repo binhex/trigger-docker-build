@@ -18,7 +18,6 @@ import urllib3
 import signal
 import kodijson
 import datetime
-import pytz
 from bs4 import BeautifulSoup
 
 urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
@@ -37,42 +36,26 @@ def create_config():
     config_obj.write()
 
 
-def time_check(grace_period, last_update):
+def time_check(current_time, grace_period_mins, trigger_datetime):
 
-    # define local time zone
-    local_time_zone = "Europe/London"
-
-    # get current local time and set timezone to gmt
-    local_time_gmt = datetime.datetime.now(pytz.timezone(local_time_zone))
-    app_logger_instance.debug(u"Local time as time object for time zone %s is %s" % (local_time_zone, local_time_gmt))
-
-    # convert local time gmt to utc
-    local_time_utc = local_time_gmt.astimezone(pytz.timezone('UTC'))
-    app_logger_instance.debug(u"Local time converted to UTC is %s" % local_time_utc)
-
-    # convert last_update time to time object
-    last_update_time = datetime.datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%S.%fZ")
-    last_update_time_utc = pytz.utc.localize(last_update_time)
-
-    # compare difference between local date/time and last update date/time to produce timedelta
-    time_delta = local_time_utc - last_update_time_utc
+    # compare difference between local date/time and trigger date/time to produce timedelta
+    time_delta = current_time - trigger_datetime
     app_logger_instance.debug(u"Time delta object is %s" % time_delta)
 
     # turn timedelta object into minutes
     time_delta_secs = datetime.timedelta.total_seconds(time_delta)
     time_delta_mins = int(time_delta_secs) / 60
 
-    app_logger_instance.info(u"Time since last update is %s minutes" % time_delta_mins)
+    grace_period_mins_int = int(grace_period_mins)
 
-    # check if time_delta is greater than or equal to grace_period
-    if time_delta_mins >= grace_period:
+    # check if time_delta is greater than or equal to grace_period_mins
+    if time_delta_mins >= grace_period_mins_int:
 
-        app_logger_instance.info(u"Time since last update is >= to grace period")
+        app_logger_instance.info(u"Time since last update (%s mins) >= to grace period (%s mins)" % (time_delta_mins, grace_period_mins))
         return True
 
     else:
-
-        app_logger_instance.info(u"Time since last update is < grace period")
+        app_logger_instance.info(u"Time since last update (%s mins) < grace period (%s mins)" % (time_delta_mins, grace_period_mins))
         return False
 
 
@@ -400,12 +383,14 @@ def monitor_sites(schedule_check_mins):
     # loop over each site and check previous and current result
     for site_item in config_site_list:
 
-        source_site_name = site_item["source_site_name"]
-        source_app_name = site_item["source_app_name"]
-        source_repo_name = site_item["source_repo_name"]
-        target_repo_name = site_item["target_repo_name"]
-        source_query_type = site_item["source_query_type"]
-        action = site_item["action"]
+        source_site_name = site_item.get("source_site_name")
+        source_app_name = site_item.get("source_app_name")
+        source_repo_name = site_item.get("source_repo_name")
+        target_repo_name = site_item.get("target_repo_name")
+        source_query_type = site_item.get("source_query_type")
+        grace_period_mins = site_item.get("grace_period_mins")
+        trigger_datetime = site_item.get("trigger_datetime")
+        action = site_item.get("action")
 
         app_logger_instance.info(u"-------------------------------------")
         app_logger_instance.info(u"Processing started for application %s..." % source_app_name)
@@ -467,9 +452,6 @@ def monitor_sites(schedule_check_mins):
 
         elif source_site_name == "aor":
 
-            # get grace period from config (in minutes), required for mirrors to replicate releases for aor
-            grace_period = config_obj["general"]["grace_period"]
-
             # use aor unofficial api to get app release info
             url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
             request_type = "get"
@@ -510,17 +492,9 @@ def monitor_sites(schedule_check_mins):
                 source_repo_name = content[0]['repo']
                 source_arch_name = content[0]['arch']
 
-                # get last update date and time (used for grace_period) example output 2017-05-27T08:55:00.294Z
-                last_update = content[0]['last_update']
-
             except (ValueError, TypeError, KeyError, IndexError):
 
                 app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
-                continue
-
-            # run function to check if time since last update is greater than or equal to grace period
-            if not time_check(grace_period, last_update):
-
                 continue
 
             source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
@@ -571,13 +545,13 @@ def monitor_sites(schedule_check_mins):
                 request_type = "get"
 
                 # download webpage content
-                return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome,request_type=request_type)
+                return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
 
                 if return_code == 0:
 
                     try:
 
-                        soup = BeautifulSoup(content)
+                        soup = BeautifulSoup(content, features="html.parser")
 
                     except (ValueError, TypeError, KeyError):
 
@@ -598,9 +572,6 @@ def monitor_sites(schedule_check_mins):
                     # get app version from soup
                     current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
 
-                    # set source site url (used for email notification link) to the same as url used to webscrape (same for this site)
-                    source_site_url = url
-
                 except IndexError:
 
                     app_logger_instance.info(u"[ERROR] Problem parsing webpage from %s, skipping to next iteration..." % url)
@@ -610,6 +581,8 @@ def monitor_sites(schedule_check_mins):
 
                 app_logger_instance.info(u"[ERROR] Source app name %s unknown, skipping to next iteration..." % source_app_name)
                 continue
+
+            source_site_url = url
 
         else:
 
@@ -637,6 +610,30 @@ def monitor_sites(schedule_check_mins):
 
             if action == "trigger":
 
+                if grace_period_mins is not None:
+
+                    current_datetime_object = datetime.datetime.now()
+                    current_datetime_str = current_datetime_object.strftime('%Y-%m-%d %H:%M:%S')
+
+                    if trigger_datetime is None:
+
+                        app_logger_instance.debug(u"Trigger datetime not defined in config.ini, creating from current datetime")
+
+                        trigger_datetime = current_datetime_str
+
+                        site_item["trigger_datetime"] = trigger_datetime
+                        config_obj.write()
+                        continue
+
+                    # run function to check if time since last update is greater than or equal to grace period
+                    else:
+
+                        trigger_datetime_object = datetime.datetime.strptime(trigger_datetime, '%Y-%m-%d %H:%M:%S')
+
+                        if not time_check(current_datetime_object, grace_period_mins, trigger_datetime_object):
+
+                            continue
+
                 app_logger_instance.info(u"[TRIGGER] Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
                 return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
 
@@ -652,6 +649,12 @@ def monitor_sites(schedule_check_mins):
 
                     app_logger_instance.warning(u"[ERROR] Problem creating github release and tag, skipping to next iteration...")
                     continue
+
+                if trigger_datetime is not None:
+
+                    app_logger_instance.debug(u"Resetting 'trigger_datetime' to 'None' for next time version trigger happens")
+                    site_item["trigger_datetime"] = None
+                    config_obj.write()
 
             elif action == "notify":
 
