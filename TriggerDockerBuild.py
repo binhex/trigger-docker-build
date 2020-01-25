@@ -456,6 +456,11 @@ def monitor_sites(schedule_check_mins):
             url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
             request_type = "get"
 
+            # if grace period not defined then set to default value (required for aor)
+            if grace_period_mins is None:
+
+                grace_period_mins = 60
+
             # download webpage content
             return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
 
@@ -543,6 +548,11 @@ def monitor_sites(schedule_check_mins):
                 # download webpage
                 url = "https://www.minecraft.net/en-us/download/server/bedrock"
                 request_type = "get"
+
+                # if grace period not defined then set to default value (required for minecraftbedrock)
+                if grace_period_mins is None:
+
+                    grace_period_mins = 60
 
                 # download webpage content
                 return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
@@ -652,8 +662,8 @@ def monitor_sites(schedule_check_mins):
 
                 if trigger_datetime is not None:
 
-                    app_logger_instance.debug(u"Resetting 'trigger_datetime' to 'None' for next time version trigger happens")
-                    site_item["trigger_datetime"] = None
+                    app_logger_instance.debug(u"Deleting 'trigger_datetime', used next time version trigger happens")
+                    del site_item["trigger_datetime"]
                     config_obj.write()
 
             elif action == "notify":
