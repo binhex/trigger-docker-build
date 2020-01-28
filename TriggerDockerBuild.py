@@ -65,7 +65,7 @@ def app_logging():
     log_level = config_obj["general"]["log_level"]
 
     # setup formatting for log messages
-    app_formatter = logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(module)s %(funcName)s :: %(message)s")
+    app_formatter = logging.Formatter("%(asctime)s %(threadName)s %(module)s %(funcName)s :: [%(levelname)s] %(message)s")
 
     # setup logger for app
     app_logger = logging.getLogger("app")
@@ -423,12 +423,12 @@ def monitor_sites(schedule_check_mins):
 
                 except (ValueError, TypeError, KeyError):
 
-                    app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
+                    app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
                     continue
 
             else:
 
-                app_logger_instance.info(u"[ERROR] Problem downloading json content from %s, skipping to new release..." % url)
+                app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
                 continue
 
             try:
@@ -445,7 +445,7 @@ def monitor_sites(schedule_check_mins):
 
             except IndexError:
 
-                app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
                 continue
 
             source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
@@ -476,12 +476,12 @@ def monitor_sites(schedule_check_mins):
 
                 except (ValueError, TypeError, KeyError, IndexError):
 
-                    app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
+                    app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
                     continue
 
             else:
 
-                app_logger_instance.info(u"[ERROR] Problem downloading json content from %s, skipping to new release..." % url)
+                app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
                 continue
 
             try:
@@ -499,7 +499,7 @@ def monitor_sites(schedule_check_mins):
 
             except (ValueError, TypeError, KeyError, IndexError):
 
-                app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
                 continue
 
             source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
@@ -521,12 +521,12 @@ def monitor_sites(schedule_check_mins):
 
                 except (ValueError, TypeError, KeyError):
 
-                    app_logger_instance.info(u"[ERROR] Problem loading json from %s, skipping to next iteration..." % url)
+                    app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
                     continue
 
             else:
 
-                app_logger_instance.info(u"[ERROR] Problem downloading json content from %s, skipping to new release..." % url)
+                app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
                 continue
 
             try:
@@ -536,7 +536,7 @@ def monitor_sites(schedule_check_mins):
 
             except IndexError:
 
-                app_logger_instance.info(u"[ERROR] Problem parsing json from %s, skipping to next iteration..." % url)
+                app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
                 continue
 
             source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
@@ -565,12 +565,12 @@ def monitor_sites(schedule_check_mins):
 
                     except (ValueError, TypeError, KeyError):
 
-                        app_logger_instance.info(u"[ERROR] Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
+                        app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
                         continue
 
                 else:
 
-                    app_logger_instance.info(u"[ERROR] Problem downloading webpage from url  %s, skipping to new release..." % url)
+                    app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % url)
                     continue
 
                 try:
@@ -584,19 +584,19 @@ def monitor_sites(schedule_check_mins):
 
                 except IndexError:
 
-                    app_logger_instance.info(u"[ERROR] Problem parsing webpage from %s, skipping to next iteration..." % url)
+                    app_logger_instance.info(u"Problem parsing webpage from %s, skipping to next iteration..." % url)
                     continue
 
             else:
 
-                app_logger_instance.info(u"[ERROR] Source app name %s unknown, skipping to next iteration..." % source_app_name)
+                app_logger_instance.info(u"Source app name %s unknown, skipping to next iteration..." % source_app_name)
                 continue
 
             source_site_url = url
 
         else:
 
-            app_logger_instance.info(u"[ERROR] Source site name %s unknown, skipping to next iteration..." % source_site_name)
+            app_logger_instance.info(u"Source site name %s unknown, skipping to next iteration..." % source_site_name)
             continue
 
         # write value for current match to config
@@ -644,7 +644,7 @@ def monitor_sites(schedule_check_mins):
 
                             continue
 
-                app_logger_instance.info(u"[TRIGGER] Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
+                app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
                 return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
 
                 if status_code == 201:
@@ -653,11 +653,11 @@ def monitor_sites(schedule_check_mins):
 
                 elif status_code == 422:
 
-                    app_logger_instance.warning(u"[ERROR] github release already exists for %s/%s, skipping build" % (target_repo_owner, target_repo_name))
+                    app_logger_instance.warning(u"github release already exists for %s/%s, skipping build" % (target_repo_owner, target_repo_name))
 
                 else:
 
-                    app_logger_instance.warning(u"[ERROR] Problem creating github release and tag, skipping to next iteration...")
+                    app_logger_instance.warning(u"Problem creating github release and tag, skipping to next iteration...")
                     continue
 
                 if trigger_datetime is not None:
@@ -668,22 +668,22 @@ def monitor_sites(schedule_check_mins):
 
             elif action == "notify":
 
-                app_logger_instance.info(u"[NOTIFY] Previous version %s and current version %s are different" % (previous_version, current_version))
+                app_logger_instance.info(u"Previous version %s and current version %s are different" % (previous_version, current_version))
 
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
 
             # send email notification
-            app_logger_instance.info(u"[NFO] Sending email notification...")
+            app_logger_instance.info(u"Sending email notification...")
             notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
 
             # send kodi notification
-            app_logger_instance.info(u"[NFO] Sending kodi notification...")
+            app_logger_instance.info(u"Sending kodi notification...")
             notification_kodi(action, source_app_name, current_version)
 
         else:
 
-            app_logger_instance.info(u"[SKIPPED] Previous version %s and current version %s match, nothing to do" % (previous_version, current_version))
+            app_logger_instance.info(u"Previous version %s and current version %s match, nothing to do" % (previous_version, current_version))
 
         app_logger_instance.info(u"Processing finished for application %s" % source_app_name)
 
