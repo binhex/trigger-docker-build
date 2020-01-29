@@ -36,10 +36,10 @@ def create_config():
     config_obj.write()
 
 
-def time_check(current_time, grace_period_mins, trigger_datetime):
+def time_check(current_time, grace_period_mins, source_version_change_datetime):
 
     # compare difference between local date/time and trigger date/time to produce timedelta
-    time_delta = current_time - trigger_datetime
+    time_delta = current_time - source_version_change_datetime
     app_logger_instance.debug(u"Time delta object is %s" % time_delta)
 
     # turn timedelta object into minutes
@@ -389,7 +389,7 @@ def monitor_sites(schedule_check_mins):
         target_repo_name = site_item.get("target_repo_name")
         source_query_type = site_item.get("source_query_type")
         grace_period_mins = site_item.get("grace_period_mins")
-        trigger_datetime = site_item.get("trigger_datetime")
+        source_version_change_datetime = site_item.get("source_version_change_datetime")
         action = site_item.get("action")
 
         app_logger_instance.info(u"-------------------------------------")
@@ -620,27 +620,27 @@ def monitor_sites(schedule_check_mins):
 
             if action == "trigger":
 
+                current_datetime_object = datetime.datetime.now()
+                current_datetime_str = current_datetime_object.strftime('%Y-%m-%d %H:%M:%S')
+
                 if grace_period_mins is not None:
 
-                    current_datetime_object = datetime.datetime.now()
-                    current_datetime_str = current_datetime_object.strftime('%Y-%m-%d %H:%M:%S')
-
-                    if trigger_datetime is None:
+                    if source_version_change_datetime is None:
 
                         app_logger_instance.debug(u"Trigger datetime not defined in config.ini, creating from current datetime")
 
-                        trigger_datetime = current_datetime_str
+                        source_version_change_datetime = current_datetime_str
 
-                        site_item["trigger_datetime"] = trigger_datetime
+                        site_item["source_version_change_datetime"] = source_version_change_datetime
                         config_obj.write()
                         continue
 
                     # run function to check if time since last update is greater than or equal to grace period
                     else:
 
-                        trigger_datetime_object = datetime.datetime.strptime(trigger_datetime, '%Y-%m-%d %H:%M:%S')
+                        source_version_change_datetime_object = datetime.datetime.strptime(source_version_change_datetime, '%Y-%m-%d %H:%M:%S')
 
-                        if not time_check(current_datetime_object, grace_period_mins, trigger_datetime_object):
+                        if not time_check(current_datetime_object, grace_period_mins, source_version_change_datetime_object):
 
                             continue
 
@@ -660,16 +660,21 @@ def monitor_sites(schedule_check_mins):
                     app_logger_instance.warning(u"Problem creating github release and tag, skipping to next iteration...")
                     continue
 
-                if trigger_datetime is not None:
+                if source_version_change_datetime is not None:
 
-                    app_logger_instance.debug(u"Deleting 'trigger_datetime', used next time version trigger happens")
-                    del site_item["trigger_datetime"]
+                    app_logger_instance.debug(u"Deleting 'source_version_change_datetime', used next time version change occurs")
+                    del site_item["source_version_change_datetime"]
                     config_obj.write()
+
+                app_logger_instance.debug(u"Creating 'target_trigger_datetime', used to track when trigger of docker build happened")
+                site_item["target_trigger_datetime"] = current_datetime_str
+                config_obj.write()
 
             elif action == "notify":
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different" % (previous_version, current_version))
 
+            app_logger_instance.debug(u"Writing curent version %s to config.ini" % current_version)
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
 
