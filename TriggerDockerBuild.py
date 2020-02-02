@@ -26,6 +26,7 @@ signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly 
 # TODO change input to functions as dictionary
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
 # TODO change return for function to dictionary
+# TODO add in option to throttle target builds for certain apps - such as jackett
 
 
 def create_config():
@@ -92,6 +93,10 @@ def app_logging():
 
         app_logger.setLevel(logging.ERROR)
 
+    elif log_level == "debug":
+
+        app_logger.setLevel(logging.DEBUG)
+
     # setup logging to console
     console_streamhandler = logging.StreamHandler()
 
@@ -113,6 +118,10 @@ def app_logging():
     elif log_level == "exception":
 
         console_streamhandler.setLevel(logging.ERROR)
+
+    elif log_level == "debug":
+
+        console_streamhandler.setLevel(logging.DEBUG)
 
     return {'logger': app_logger, 'handler': app_rotatingfilehandler}
 
@@ -351,7 +360,7 @@ def http_client(**kwargs):
             return 0, status_code, content
 
 
-def github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token):
+def github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
 
     # remove illegal characters from version (github does not allow certain chars for release name)
     current_version = re.sub(ur":", ur".", current_version, flags=re.IGNORECASE)
@@ -373,12 +382,209 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     return return_code, status_code, content
 
 
+def github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome):
+
+    # certain github repos do not have releases, only tags, thus we need to account for these differently
+    if source_query_type.lower() == "tag":
+
+        github_query_type = "tags"
+        json_query = "name"
+
+    else:
+
+        github_query_type = "releases/latest"
+        json_query = "tag_name"
+
+    # use github rest api to get app release info
+    url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
+    request_type = "get"
+
+    # download webpage content
+    return_code, status_code, content = http_client(url=url, auth=('binhex', target_access_token), user_agent=user_agent_chrome, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            content = json.loads(content)
+
+        except (ValueError, TypeError, KeyError):
+
+            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            return 1
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        return 1
+
+    try:
+
+        if github_query_type == "tags":
+
+            # get version from json
+            current_version = content[0]['%s' % json_query]
+
+        else:
+
+            # get version from json
+            current_version = content['%s' % json_query]
+
+    except IndexError:
+
+        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        return 1
+
+    source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
+
+    return 0, current_version, source_site_url
+
+
+def aor_apps(source_app_name, user_agent_chrome):
+
+    # use aor unofficial api to get app release info
+    url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
+    request_type = "get"
+
+    # download webpage content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            # decode json
+            content = json.loads(content)
+
+            # filter python objects with list comprehension to prevent fuzzy mismatch
+            content = [x for x in content['results'] if x['pkgname'] == source_app_name]
+
+        except (ValueError, TypeError, KeyError, IndexError):
+
+            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            return 1
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        return 1
+
+    try:
+
+        # get package version and release number from json
+        pkgver = content[0]['pkgver']
+        pkgrel = content[0]['pkgrel']
+
+        # construct app version
+        current_version = "%s-%s" % (pkgver, pkgrel)
+
+        # get repo name and arch type (used in url construct for email notification)
+        source_repo_name = content[0]['repo']
+        source_arch_name = content[0]['arch']
+
+    except (ValueError, TypeError, KeyError, IndexError):
+
+        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        return 1
+
+    source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
+
+    return 0, current_version, source_site_url
+
+
+def aur_apps(source_app_name, user_agent_chrome):
+
+    # use aur api to get app release info
+    url = "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=%s" % source_app_name
+    request_type = "get"
+
+    # download webpage content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            content = json.loads(content)
+
+        except (ValueError, TypeError, KeyError):
+
+            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            return 1
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        return 1
+
+    try:
+
+        # get app version from json
+        current_version = content["results"][0]["Version"]
+
+    except IndexError:
+
+        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        return 1
+
+    source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
+
+    return 0, current_version, source_site_url
+
+
+def regex_minecraftbedrock(user_agent_chrome):
+
+    # download webpage
+    url = "https://www.minecraft.net/en-us/download/server/bedrock"
+    request_type = "get"
+
+    # download webpage content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            soup = BeautifulSoup(content, features="html.parser")
+
+        except (ValueError, TypeError, KeyError):
+
+            app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
+            return 1
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % url)
+        return 1
+
+    try:
+
+        # get download url from soup
+        url_line = soup.select('a[data-platform="serverBedrockLinux"]')
+        download_url = url_line[0]['href']
+
+        # get app version from soup
+        current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
+
+    except IndexError:
+
+        app_logger_instance.info(u"Problem parsing webpage from %s, skipping to next iteration..." % url)
+        return 1
+
+    source_site_url = url
+
+    return 0, current_version, source_site_url
+
+
 def monitor_sites(schedule_check_mins):
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
     target_repo_owner = config_obj["general"]["target_repo_owner"]
     target_access_token = config_obj["general"]["target_access_token"]
+
+    # read sites list from config
+    user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
@@ -397,202 +603,52 @@ def monitor_sites(schedule_check_mins):
 
         if source_site_name == "github":
 
-            # certain github repos do not have releases, only tags, thus we need to account for these differently
-            if source_query_type.lower() == "tag":
+            return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome)
 
-                github_query_type = "tags"
-                json_query = "name"
+            if return_code != 0:
 
-            else:
-
-                github_query_type = "releases/latest"
-                json_query = "tag_name"
-
-            # use github rest api to get app release info
-            url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
-            request_type = "get"
-
-            # download webpage content
-            return_code, status_code, content = http_client(url=url, auth=('binhex', target_access_token), user_agent=user_agent_chrome, request_type=request_type)
-
-            if return_code == 0:
-
-                try:
-
-                    content = json.loads(content)
-
-                except (ValueError, TypeError, KeyError):
-
-                    app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
-                    continue
-
-            else:
-
-                app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
                 continue
-
-            try:
-
-                if github_query_type == "tags":
-
-                    # get version from json
-                    current_version = content[0]['%s' % json_query]
-
-                else:
-
-                    # get version from json
-                    current_version = content['%s' % json_query]
-
-            except IndexError:
-
-                app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-                continue
-
-            source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
 
         elif source_site_name == "aor":
-
-            # use aor unofficial api to get app release info
-            url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
-            request_type = "get"
 
             # if grace period not defined then set to default value (required for aor)
             if grace_period_mins is None:
 
                 grace_period_mins = 60
 
-            # download webpage content
-            return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+            return_code, current_version, source_site_url = aor_apps(source_app_name, user_agent_chrome)
 
-            if return_code == 0:
+            if return_code != 0:
 
-                try:
-
-                    # decode json
-                    content = json.loads(content)
-
-                    # filter python objects with list comprehension to prevent fuzzy mismatch
-                    content = [x for x in content['results'] if x['pkgname'] == source_app_name]
-
-                except (ValueError, TypeError, KeyError, IndexError):
-
-                    app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
-                    continue
-
-            else:
-
-                app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
                 continue
-
-            try:
-
-                # get package version and release number from json
-                pkgver = content[0]['pkgver']
-                pkgrel = content[0]['pkgrel']
-
-                # construct app version
-                current_version = "%s-%s" % (pkgver, pkgrel)
-
-                # get repo name and arch type (used in url construct for email notification)
-                source_repo_name = content[0]['repo']
-                source_arch_name = content[0]['arch']
-
-            except (ValueError, TypeError, KeyError, IndexError):
-
-                app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-                continue
-
-            source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
 
         elif source_site_name == "aur":
 
-            # use aur api to get app release info
-            url = "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=%s" % source_app_name
-            request_type = "get"
+            return_code, current_version, source_site_url = aur_apps(source_app_name, user_agent_chrome)
 
-            # download webpage content
-            return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+            if return_code != 0:
 
-            if return_code == 0:
-
-                try:
-
-                    content = json.loads(content)
-
-                except (ValueError, TypeError, KeyError):
-
-                    app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
-                    continue
-
-            else:
-
-                app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
                 continue
-
-            try:
-
-                # get app version from json
-                current_version = content["results"][0]["Version"]
-
-            except IndexError:
-
-                app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-                continue
-
-            source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
 
         elif source_site_name == "regex":
 
             if source_app_name == "minecraftbedrock":
-
-                # download webpage
-                url = "https://www.minecraft.net/en-us/download/server/bedrock"
-                request_type = "get"
 
                 # if grace period not defined then set to default value (required for minecraftbedrock)
                 if grace_period_mins is None:
 
                     grace_period_mins = 60
 
-                # download webpage content
-                return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+                return_code, current_version, source_site_url = regex_minecraftbedrock(user_agent_chrome)
 
-                if return_code == 0:
+                if return_code != 0:
 
-                    try:
-
-                        soup = BeautifulSoup(content, features="html.parser")
-
-                    except (ValueError, TypeError, KeyError):
-
-                        app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
-                        continue
-
-                else:
-
-                    app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % url)
-                    continue
-
-                try:
-
-                    # get download url from soup
-                    url_line = soup.select('a[data-platform="serverBedrockLinux"]')
-                    download_url = url_line[0]['href']
-
-                    # get app version from soup
-                    current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
-
-                except IndexError:
-
-                    app_logger_instance.info(u"Problem parsing webpage from %s, skipping to next iteration..." % url)
                     continue
 
             else:
 
                 app_logger_instance.info(u"Source app name %s unknown, skipping to next iteration..." % source_app_name)
                 continue
-
-            source_site_url = url
 
         else:
 
@@ -623,12 +679,12 @@ def monitor_sites(schedule_check_mins):
                 current_datetime_object = datetime.datetime.now()
                 current_datetime_str = current_datetime_object.strftime('%Y-%m-%d %H:%M:%S')
 
+                app_logger_instance.debug(u"Grace period in mins is defined as %s" % grace_period_mins)
                 if grace_period_mins is not None:
 
                     if source_version_change_datetime is None:
 
                         app_logger_instance.debug(u"Trigger datetime not defined in config.ini, creating from current datetime")
-
                         source_version_change_datetime = current_datetime_str
 
                         site_item["source_version_change_datetime"] = source_version_change_datetime
@@ -645,7 +701,7 @@ def monitor_sites(schedule_check_mins):
                             continue
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
-                return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token)
+                return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
 
                 if status_code == 201:
 
@@ -725,9 +781,7 @@ def scheduler_start():
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
-    user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
-
-    version = "1.0.0"
+    version = "1.1.0"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
