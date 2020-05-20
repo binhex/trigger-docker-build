@@ -201,7 +201,7 @@ def http_client(**kwargs):
         else:
 
             app_logger_instance.warning(u'No URL sent to function, exiting function...')
-            return 1, None
+            return 1, None, None
 
         if "user_agent" in kwargs:
 
@@ -210,7 +210,7 @@ def http_client(**kwargs):
         else:
 
             app_logger_instance.warning(u'No User Agent sent to function, exiting function...')
-            return 1, None
+            return 1, None, None
 
         if "request_type" in kwargs:
 
@@ -219,7 +219,7 @@ def http_client(**kwargs):
         else:
 
             app_logger_instance.warning(u'No request type (get/put/post) sent to function, exiting function...')
-            return 1, None
+            return 1, None, None
 
         # optional stuff to include
         if "auth" in kwargs:
@@ -249,7 +249,7 @@ def http_client(**kwargs):
     else:
 
         app_logger_instance.warning(u'No keyword args sent to function, exiting function...')
-        return 1
+        return 1, None, None
 
     # set connection timeout value (max time to wait for connection)
     connect_timeout = 10.0
@@ -271,14 +271,14 @@ def http_client(**kwargs):
 
         session.headers = {
             'Accept-encoding': 'gzip',
-            'User-Agent': user_agent
+            'User-Agent': user_agent,
         }
 
         if "additional_header" in kwargs:
 
             # append to headers dict with additional headers dict
             session.headers.update(additional_header)
-
+        print session.headers
         if "auth" in kwargs:
 
             session.auth = auth
@@ -367,18 +367,15 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
 
     app_logger_instance.info(u"Creating Release on GitHub for version %s..." % current_version)
 
-    target_repo_owner = target_repo_owner
-    target_repo_name = target_repo_name
-    target_access_token = target_access_token
     github_tag_name = "%s-01" % current_version
     github_release_name = "API/URL triggered release"
     github_release_body = github_tag_name
     request_type = "post"
-    http_url = 'https://api.github.com/repos/%s/%s/releases?access_token=%s' % (target_repo_owner, target_repo_name, target_access_token)
-    data_payload = '{"tag_name": "%s","target_commitish": "master","name": "%s","body": "%s","draft": false,"prerelease": false}' % (github_tag_name, github_release_name, github_release_body)
+    http_url = 'https://api.github.com/repos/%s/%s/releases' % (target_repo_owner, target_repo_name)
+    data_payload = '{"tag_name": "%s", "target_commitish": "master", "name": "%s", "body": "%s", "draft": false, "prerelease": false}' % (github_tag_name, github_release_name, github_release_body)
 
     # process post request
-    return_code, status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, request_type=request_type, data_payload=data_payload)
+    return_code, status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type, data_payload=data_payload)
     return return_code, status_code, content
 
 
@@ -400,7 +397,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
     request_type = "get"
 
     # download webpage content
-    return_code, status_code, content = http_client(url=url, auth=('binhex', target_access_token), user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
 
     if return_code == 0:
 
@@ -411,12 +408,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
-            return 1
+            return 1, None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
-        return 1
+        return 1, None, None
 
     try:
 
@@ -433,7 +430,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
     except IndexError:
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1
+        return 1, None, None
 
     source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
 
@@ -462,12 +459,12 @@ def aor_apps(source_app_name, user_agent_chrome):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
-            return 1
+            return 1, None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
-        return 1
+        return 1, None, None
 
     try:
 
@@ -485,7 +482,7 @@ def aor_apps(source_app_name, user_agent_chrome):
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1
+        return 1, None, None
 
     source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
 
@@ -510,12 +507,12 @@ def aur_apps(source_app_name, user_agent_chrome):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
-            return 1
+            return 1, None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
-        return 1
+        return 1, None, None
 
     try:
 
@@ -525,7 +522,7 @@ def aur_apps(source_app_name, user_agent_chrome):
     except IndexError:
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1
+        return 1, None, None
 
     source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
 
@@ -550,12 +547,12 @@ def regex_minecraftbedrock(user_agent_chrome):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
-            return 1
+            return 1, None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % url)
-        return 1
+        return 1, None, None
 
     try:
 
@@ -569,7 +566,7 @@ def regex_minecraftbedrock(user_agent_chrome):
     except IndexError:
 
         app_logger_instance.info(u"Problem parsing webpage from %s, skipping to next iteration..." % url)
-        return 1
+        return 1, None, None
 
     source_site_url = url
 
@@ -583,7 +580,7 @@ def monitor_sites(schedule_check_mins):
     target_repo_owner = config_obj["general"]["target_repo_owner"]
     target_access_token = config_obj["general"]["target_access_token"]
 
-    # read sites list from config
+    # fake being a browser
     user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
 
     # loop over each site and check previous and current result
