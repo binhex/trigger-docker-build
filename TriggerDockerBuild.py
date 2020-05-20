@@ -278,7 +278,7 @@ def http_client(**kwargs):
 
             # append to headers dict with additional headers dict
             session.headers.update(additional_header)
-        print session.headers
+
         if "auth" in kwargs:
 
             session.auth = auth
