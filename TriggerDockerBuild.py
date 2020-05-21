@@ -433,12 +433,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
 
     try:
 
-        if github_query_type == "tags" or "branch":
+        if github_query_type == "tags" or github_query_type == "commits":
 
             # get tag/sha from json
             current_version = content[0]['%s' % json_query]
 
-        if github_query_type == "release":
+        elif github_query_type == "releases/latest":
 
             # get release from json
             current_version = content['%s' % json_query]
