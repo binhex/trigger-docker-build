@@ -379,7 +379,7 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     return return_code, status_code, content
 
 
-def github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome):
+def github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name):
 
     # certain github repos do not have releases, only tags, thus we need to account for these differently
     if source_query_type.lower() == "tag":
@@ -387,16 +387,32 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
         github_query_type = "tags"
         json_query = "name"
 
-    else:
+    elif source_query_type.lower() == "release":
 
         github_query_type = "releases/latest"
         json_query = "tag_name"
 
-    # use github rest api to get app release info
+    elif source_query_type.lower() == "branch":
+
+        github_query_type = "commits"
+        json_query = "sha"
+
+    else:
+
+        app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
+        return 1, None, None
+
+    # construct url to github rest api
     url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
+
+    # if github branch then we specify the branch name via 'sha' parameter
+    if source_query_type.lower() == "branch":
+
+        url = "%s?sha=%s" % (url, source_branch_name)
+
     request_type = "get"
 
-    # download webpage content
+    # download json content
     return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
 
     if return_code == 0:
@@ -417,14 +433,14 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
 
     try:
 
-        if github_query_type == "tags":
+        if github_query_type == "tags" or "branch":
 
-            # get version from json
+            # get tag/sha from json
             current_version = content[0]['%s' % json_query]
 
-        else:
+        if github_query_type == "release":
 
-            # get version from json
+            # get release from json
             current_version = content['%s' % json_query]
 
     except IndexError:
@@ -433,6 +449,10 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
         return 1, None, None
 
     source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
+
+    if source_query_type.lower() == "branch":
+
+        source_site_url = "%s/%s" % (source_site_url, source_branch_name)
 
     return 0, current_version, source_site_url
 
@@ -589,6 +609,7 @@ def monitor_sites(schedule_check_mins):
         source_site_name = site_item.get("source_site_name")
         source_app_name = site_item.get("source_app_name")
         source_repo_name = site_item.get("source_repo_name")
+        source_branch_name = site_item.get("source_branch_name")
         target_repo_name = site_item.get("target_repo_name")
         source_query_type = site_item.get("source_query_type")
         grace_period_mins = site_item.get("grace_period_mins")
@@ -600,7 +621,7 @@ def monitor_sites(schedule_check_mins):
 
         if source_site_name == "github":
 
-            return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome)
+            return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name)
 
             if return_code != 0:
 
@@ -688,7 +709,7 @@ def monitor_sites(schedule_check_mins):
                         config_obj.write()
                         continue
 
-                    # run function to check if time since last update is greater than or equal to grace period
+                    # run function to check if time since last source change is greater than or equal to grace period
                     else:
 
                         source_version_change_datetime_object = datetime.datetime.strptime(source_version_change_datetime, '%Y-%m-%d %H:%M:%S')
@@ -706,7 +727,8 @@ def monitor_sites(schedule_check_mins):
 
                 elif status_code == 422:
 
-                    app_logger_instance.warning(u"github release already exists for %s/%s, skipping build" % (target_repo_owner, target_repo_name))
+                    app_logger_instance.warning(u"GitHub release already exists for %s/%s, skipping to next iteration..." % (target_repo_owner, target_repo_name))
+                    continue
 
                 else:
 
