@@ -669,34 +669,6 @@ def monitor_sites(schedule_check_mins):
 
         if source_site_name == "github":
 
-            if target_release_days:
-
-                return_code, last_release_date = github_target_last_release_date(target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
-
-                if return_code != 0:
-
-                    app_logger_instance.warning(u"Unable to identify target release date for repo '%s', skipping to next iteration..." % target_repo_name)
-                    continue
-
-                current_datetime_object = datetime.datetime.now()
-                target_release_date_object = datetime.datetime.strptime(last_release_date, '%Y-%m-%dT%H:%M:%SZ')
-
-                # compare difference between local date/time and trigger date/time to produce timedelta
-                target_time_delta = current_datetime_object - target_release_date_object
-
-                # extract days from time delta
-                target_time_delta_days = target_time_delta.days
-                app_logger_instance.debug(u"Target release was '%s' days ago" % target_time_delta_days)
-
-                if target_time_delta_days < target_release_days:
-
-                    app_logger_instance.info(u"Target release date for app '%s' is less than '%s' days ago, skipping to next iteration..." % (target_repo_name, target_release_days))
-                    continue
-
-                else:
-
-                    app_logger_instance.info(u"Target release date for app '%s' is >= '%s' days ago, proceeding..." % (target_repo_name, target_release_days))
-
             return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name)
 
             if return_code != 0:
@@ -730,11 +702,6 @@ def monitor_sites(schedule_check_mins):
         elif source_site_name == "regex":
 
             if source_app_name == "minecraftbedrock":
-
-                # if grace period not defined then set to default value (required for minecraftbedrock)
-                if grace_period_mins is None:
-
-                    grace_period_mins = 60
 
                 return_code, current_version, source_site_url = regex_minecraftbedrock(user_agent_chrome)
 
@@ -777,8 +744,7 @@ def monitor_sites(schedule_check_mins):
                 current_datetime_object = datetime.datetime.now()
                 current_datetime_str = current_datetime_object.strftime('%Y-%m-%d %H:%M:%S')
 
-                app_logger_instance.debug(u"Grace period in mins is defined as %s" % grace_period_mins)
-                if grace_period_mins is not None:
+                if grace_period_mins:
 
                     if source_version_change_datetime is None:
 
@@ -802,6 +768,33 @@ def monitor_sites(schedule_check_mins):
                         else:
 
                             app_logger_instance.info(u"Source version change for app '%s' is >= '%s' mins ago, proceeding..." % (source_app_name, grace_period_mins))
+
+                if target_release_days:
+
+                    return_code, last_release_date = github_target_last_release_date(target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
+
+                    if return_code != 0:
+
+                        app_logger_instance.warning(u"Unable to identify target release date for repo '%s', skipping to next iteration..." % target_repo_name)
+                        continue
+
+                    target_release_date_object = datetime.datetime.strptime(last_release_date, '%Y-%m-%dT%H:%M:%SZ')
+
+                    # compare difference between local date/time and trigger date/time to produce timedelta
+                    target_time_delta = current_datetime_object - target_release_date_object
+
+                    # extract days from time delta
+                    target_time_delta_days = target_time_delta.days
+                    app_logger_instance.debug(u"Target release was '%s' days ago" % target_time_delta_days)
+
+                    if target_time_delta_days < target_release_days:
+
+                        app_logger_instance.info(u"Target release date for app '%s' is less than '%s' days ago, skipping to next iteration..." % (target_repo_name, target_release_days))
+                        continue
+
+                    else:
+
+                        app_logger_instance.info(u"Target release date for app '%s' is >= '%s' days ago, proceeding..." % (target_repo_name, target_release_days))
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
                 return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
