@@ -688,7 +688,7 @@ def monitor_sites(schedule_check_mins):
                 target_time_delta_days = target_time_delta.days
                 app_logger_instance.debug(u"Target release was '%s' days ago" % target_time_delta_days)
 
-                if target_time_delta_days >= target_release_days:
+                if target_time_delta_days < target_release_days:
 
                     app_logger_instance.info(u"Target release date for app '%s' is less than '%s' days ago, skipping to next iteration..." % (target_repo_name, target_release_days))
                     continue
