@@ -379,6 +379,48 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     return return_code, status_code, content
 
 
+def github_target_last_release_date(target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
+
+    github_query_type = "releases/latest"
+    json_query = "published_at"
+
+    # construct url to github rest api
+    url = "https://api.github.com/repos/%s/%s/%s" % (target_repo_owner, target_repo_name, github_query_type)
+    request_type = "get"
+
+    # download json content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            content = json.loads(content)
+
+        except (ValueError, TypeError, KeyError):
+
+            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            return 1, None
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        return 1, None
+
+    try:
+
+        # get release date from json
+        target_last_release_date = content['%s' % json_query]
+
+    except IndexError:
+
+        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        return 1, None
+
+    # convert the following then compare against throttle days value "2020-04-15T21:53:20Z"
+    return 0, target_last_release_date
+
+
 def github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name):
 
     # certain github repos do not have releases, only tags, thus we need to account for these differently
@@ -443,9 +485,14 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
             # get release from json
             current_version = content['%s' % json_query]
 
+        else:
+
+            app_logger_instance.warning(u"Unknown Github query type of '%s', skipping to next iteration..." % github_query_type)
+            return 1, None, None
+
     except IndexError:
 
-        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        app_logger_instance.warning(u"Problem parsing json from %s, skipping to next iteration..." % url)
         return 1, None, None
 
     source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
@@ -610,6 +657,7 @@ def monitor_sites(schedule_check_mins):
         source_app_name = site_item.get("source_app_name")
         source_repo_name = site_item.get("source_repo_name")
         source_branch_name = site_item.get("source_branch_name")
+        target_release_days = site_item.get("target_release_days")
         target_repo_name = site_item.get("target_repo_name")
         source_query_type = site_item.get("source_query_type")
         grace_period_mins = site_item.get("grace_period_mins")
@@ -621,10 +669,39 @@ def monitor_sites(schedule_check_mins):
 
         if source_site_name == "github":
 
+            if target_release_days:
+
+                return_code, last_release_date = github_target_last_release_date(target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
+
+                if return_code != 0:
+
+                    app_logger_instance.warning(u"Unable to identify target release date for repo '%s', skipping to next iteration..." % target_repo_name)
+                    continue
+
+                current_datetime_object = datetime.datetime.now()
+                target_release_date_object = datetime.datetime.strptime(last_release_date, '%Y-%m-%dT%H:%M:%SZ')
+
+                # compare difference between local date/time and trigger date/time to produce timedelta
+                target_time_delta = current_datetime_object - target_release_date_object
+
+                # extract days from time delta
+                target_time_delta_days = target_time_delta.days
+                app_logger_instance.debug(u"Target release was '%s' days ago" % target_time_delta_days)
+
+                if target_time_delta_days >= target_release_days:
+
+                    app_logger_instance.info(u"Target release date for app '%s' is less than '%s' days ago, skipping to next iteration..." % (target_repo_name, target_release_days))
+                    continue
+
+                else:
+
+                    app_logger_instance.info(u"Target release date for app '%s' is >= '%s' days ago, proceeding..." % (target_repo_name, target_release_days))
+
             return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name)
 
             if return_code != 0:
 
+                app_logger_instance.warning(u"Unable to identify release, tag, or commit for repo '%s', skipping to next iteration..." % source_repo_name)
                 continue
 
         elif source_site_name == "aor":
@@ -638,6 +715,7 @@ def monitor_sites(schedule_check_mins):
 
             if return_code != 0:
 
+                app_logger_instance.warning(u"Unable to identify current version of %s repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name))
                 continue
 
         elif source_site_name == "aur":
@@ -646,6 +724,7 @@ def monitor_sites(schedule_check_mins):
 
             if return_code != 0:
 
+                app_logger_instance.warning(u"Unable to identify current version of %s repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name))
                 continue
 
         elif source_site_name == "regex":
@@ -661,16 +740,17 @@ def monitor_sites(schedule_check_mins):
 
                 if return_code != 0:
 
+                    app_logger_instance.warning(u"Unable to identify current version of %s repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name))
                     continue
 
             else:
 
-                app_logger_instance.info(u"Source app name %s unknown, skipping to next iteration..." % source_app_name)
+                app_logger_instance.warning(u"Source app name %s unknown, skipping to next iteration..." % source_app_name)
                 continue
 
         else:
 
-            app_logger_instance.info(u"Source site name %s unknown, skipping to next iteration..." % source_site_name)
+            app_logger_instance.warning(u"Source site name %s unknown, skipping to next iteration..." % source_site_name)
             continue
 
         # write value for current match to config
@@ -716,7 +796,12 @@ def monitor_sites(schedule_check_mins):
 
                         if not time_check(current_datetime_object, grace_period_mins, source_version_change_datetime_object):
 
+                            app_logger_instance.info(u"Source version change for app '%s' is less than '%s' mins ago, skipping to next iteration..." % (source_app_name, grace_period_mins))
                             continue
+
+                        else:
+
+                            app_logger_instance.info(u"Source version change for app '%s' is >= '%s' mins ago, proceeding..." % (source_app_name, grace_period_mins))
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
                 return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
@@ -727,7 +812,10 @@ def monitor_sites(schedule_check_mins):
 
                 elif status_code == 422:
 
-                    app_logger_instance.warning(u"GitHub release already exists for %s/%s, skipping to next iteration..." % (target_repo_owner, target_repo_name))
+                    app_logger_instance.warning(u"GitHub release already exists for %s/%s, overwriting current version and skipping to next iteration..." % (target_repo_owner, target_repo_name))
+                    app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
+                    config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
+                    config_obj.write()
                     continue
 
                 else:
@@ -749,7 +837,7 @@ def monitor_sites(schedule_check_mins):
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different" % (previous_version, current_version))
 
-            app_logger_instance.debug(u"Writing curent version %s to config.ini" % current_version)
+            app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
 
