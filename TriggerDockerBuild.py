@@ -785,16 +785,17 @@ def monitor_sites(schedule_check_mins):
 
                     # extract days from time delta
                     target_time_delta_days = target_time_delta.days
-                    app_logger_instance.debug(u"Target release was '%s' days ago" % target_time_delta_days)
+                    app_logger_instance.debug(u"Minimum days between target releases is '%s' days" % target_release_days)
+                    app_logger_instance.debug(u"Last target release was '%s' days ago" % target_time_delta_days)
 
-                    if target_time_delta_days < target_release_days:
+                    if int(target_time_delta_days) >= int(target_release_days):
 
-                        app_logger_instance.info(u"Target release date for app '%s' is less than '%s' days ago, skipping to next iteration..." % (target_repo_name, target_release_days))
-                        continue
+                        app_logger_instance.info(u"Last target release date for app '%s' is >= '%s' days ago, proceeding..." % (target_repo_name, target_release_days))
 
                     else:
 
-                        app_logger_instance.info(u"Target release date for app '%s' is >= '%s' days ago, proceeding..." % (target_repo_name, target_release_days))
+                        app_logger_instance.info(u"Last target release date for app '%s' is less than '%s' days ago, skipping to next iteration..." % (target_repo_name, target_release_days))
+                        continue
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
                 return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
