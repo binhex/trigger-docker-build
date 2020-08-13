@@ -596,14 +596,13 @@ def aur_apps(source_app_name, user_agent_chrome):
     return 0, current_version, source_site_url
 
 
-def regex_minecraftbedrock(user_agent_chrome):
+def soup_regex(source_site_url, user_agent_chrome):
 
     # download webpage
-    url = "https://www.minecraft.net/en-us/download/server/bedrock"
     request_type = "get"
 
     # download webpage content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=source_site_url, user_agent=user_agent_chrome, request_type=request_type)
 
     if return_code == 0:
 
@@ -613,31 +612,15 @@ def regex_minecraftbedrock(user_agent_chrome):
 
         except (ValueError, TypeError, KeyError):
 
-            app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % url)
-            return 1, None, None
+            app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % source_site_url)
+            return 1, None
 
     else:
 
-        app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % url)
-        return 1, None, None
+        app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % source_site_url)
+        return 1, None
 
-    try:
-
-        # get download url from soup
-        url_line = soup.select('a[data-platform="serverBedrockLinux"]')
-        download_url = url_line[0]['href']
-
-        # get app version from soup
-        current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
-
-    except IndexError:
-
-        app_logger_instance.info(u"Problem parsing webpage from %s, skipping to next iteration..." % url)
-        return 1, None, None
-
-    source_site_url = url
-
-    return 0, current_version, source_site_url
+    return 0, soup
 
 
 def monitor_sites(schedule_check_mins):
@@ -703,16 +686,82 @@ def monitor_sites(schedule_check_mins):
 
             if source_app_name == "minecraftbedrock":
 
-                return_code, current_version, source_site_url = regex_minecraftbedrock(user_agent_chrome)
+                source_site_url = "https://www.minecraft.net/en-us/download/server/bedrock"
+                return_code, soup = soup_regex(source_site_url, user_agent_chrome)
 
                 if return_code != 0:
 
-                    app_logger_instance.warning(u"Unable to identify current version of %s repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name))
+                    app_logger_instance.info(u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url)
+                    continue
+
+                try:
+
+                    # get download url from soup
+                    url_line = soup.select('a[data-platform="serverBedrockLinux"]')
+                    download_url = url_line[0]['href']
+
+                except IndexError:
+
+                    app_logger_instance.warning(u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
+                    continue
+
+                try:
+
+                    # get app version from soup
+                    current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
+
+                except IndexError:
+
+                    request_type = "get"
+                    github_fallback_version_url = "https://raw.githubusercontent.com/ich777/docker-minecraft-bedrock/master/version"
+                    return_code, status_code, content = http_client(url=github_fallback_version_url,user_agent=user_agent_chrome,request_type=request_type)
+
+                    if return_code != 0:
+
+                        app_logger_instance.warning(u"Unable to identify app version using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
+                        continue
+
+                    else:
+
+                        current_version = content
+
+            elif source_app_name == "minecraftserver":
+
+                source_site_url = "https://www.minecraft.net/en-us/download/server"
+                return_code, soup = soup_regex(source_site_url, user_agent_chrome)
+
+                if return_code != 0:
+
+                    app_logger_instance.info(u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url)
+                    continue
+
+                try:
+
+                    # get download url from soup
+                    url_line = soup.select('a[aria-label="mincraft version"]')[0]
+                    download_url = url_line['href']
+
+                except IndexError:
+
+                    app_logger_instance.debug(u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name)
+
+                try:
+
+                    # get download url from soup
+                    url_line = soup.select('a[aria-label="mincraft version"]')[0]
+                    url_line_string = str(url_line)
+
+                    # get app version from soup
+                    current_version = re.search(r"[\d]+[\d.]+(?=.jar)", url_line_string).group()
+
+                except IndexError:
+
+                    app_logger_instance.warning(u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
                     continue
 
             else:
 
-                app_logger_instance.warning(u"Source app name %s unknown, skipping to next iteration..." % source_app_name)
+                app_logger_instance.warning(u"Source site app %s unknown, skipping to next iteration..." % source_app_name)
                 continue
 
         else:
