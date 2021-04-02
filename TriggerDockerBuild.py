@@ -429,6 +429,11 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
         github_query_type = "tags"
         json_query = "name"
 
+    elif source_query_type.lower() == "pre-release":
+
+        github_query_type = "releases"
+        json_query = "tag_name"
+
     elif source_query_type.lower() == "release":
 
         github_query_type = "releases/latest"
