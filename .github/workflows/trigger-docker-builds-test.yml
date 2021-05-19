@@ -38,7 +38,17 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh gist list --secret
+            config_file='trigger-docker-build-config'
+            gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file}" | awk -F ' ' '{ print $1 }')
+      - name: Change directory to workspace
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+            cd "${GITHUB_WORKSPACE}
       - name: Download config from secret Gist
         uses: nick-invision/retry@v2.4.0
         with:
@@ -47,8 +57,8 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh gist clone "${{ secrets.GIST_CONFIG }}" '/tmp/gist'
-            cp '/tmp/gist/config.ini' "${GITHUB_WORKSPACE}/configs"
+            gh gist clone "${gist_id}" '/tmp/gist'
+            cp '/tmp/gist/config.ini' './configs'
       - name: Run TDB
         uses: nick-invision/retry@v2.4.0
         with:
@@ -58,7 +68,7 @@ jobs:
           retry_on: error
           command: |
             python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --config ./configs --logs ./logs
-      - name: Upload config to Gist
+      - name: Create Gist
         uses: nick-invision/retry@v2.4.0
         with:
           timeout_minutes: 60
@@ -66,7 +76,16 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            cat "${GITHUB_WORKSPACE}/configs/config.ini" | gh gist edit "${{ secrets.GIST_CONFIG }}" -
+            gh gist create --filename './configs/config.ini'
+      - name: Delete old Gist
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+            true
       - name: Debug
         uses: nick-invision/retry@v2.4.0
         with:
@@ -76,7 +95,7 @@ jobs:
           retry_on: error
           command: |
             pwd
-            cat "${GITHUB_WORKSPACE}/configs/config.ini"
+            cat './configs/config.ini'
             export
             ls -al
             ls -al ./configs
