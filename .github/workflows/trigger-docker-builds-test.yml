@@ -1,8 +1,7 @@
-name: trigger-docker-builds-prod
+name: trigger-docker-builds-test
 
 on:
-  schedule:
-  - cron: "30 1 * * *"
+  workflow_dispatch:
 
 jobs:
   run-tdb:
