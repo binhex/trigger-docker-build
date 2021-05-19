@@ -48,7 +48,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            cd "${GITHUB_WORKSPACE}
+            cd "${GITHUB_WORKSPACE}"
       - name: Download config from secret Gist
         uses: nick-invision/retry@v2.4.0
         with:
