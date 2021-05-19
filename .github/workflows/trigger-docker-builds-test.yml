@@ -30,7 +30,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh auth login --with-token < /bin/echo "${CR_PAT}"
+            echo "${CR_PAT}" | gh auth login --with-token
       - name: Download config from Gist
         uses: nick-invision/retry@v2.4.0
         with:
