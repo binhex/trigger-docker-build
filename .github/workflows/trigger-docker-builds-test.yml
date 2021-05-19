@@ -17,4 +17,4 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            python3
+            ls -al
