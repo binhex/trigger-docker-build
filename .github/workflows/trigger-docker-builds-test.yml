@@ -39,7 +39,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh gist clone "${{ secrets.GIST_CONFIG }}" /tmp/gist
+            gh gist clone "${{ secrets.GIST_CONFIG }}" "${GITHUB_WORKSPACE}/configs"
       - name: Run TDB
         uses: nick-invision/retry@v2.4.0
         with:
@@ -57,6 +57,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
+            true
       - name: Debug
         uses: nick-invision/retry@v2.4.0
         with:
@@ -65,6 +66,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
+            cat "${GITHUB_WORKSPACE}/configs/config.ini"
             export
             ls -al
             ls -al ./configs
