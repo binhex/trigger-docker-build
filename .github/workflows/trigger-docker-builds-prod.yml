@@ -4,6 +4,13 @@ on:
   schedule:
   - cron: "30 1 * * *"
 
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description:
+        default:
+
 jobs:
   run-tdb:
     runs-on: ubuntu-latest
