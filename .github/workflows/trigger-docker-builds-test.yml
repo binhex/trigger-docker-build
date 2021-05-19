@@ -20,7 +20,7 @@ jobs:
             cd /tmp
             curl -o './github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
             tar -xvf './github-cli.tar.gz'
-            cp ./gh*linux_amd64/bin/gh '/usr/local/bin/'
+            sudo cp ./gh*linux_amd64/bin/gh '/usr/local/bin/'
       - name: Authenticate with GitHub for private Gist
         uses: nick-invision/retry@v2.4.0
         with:
