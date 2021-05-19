@@ -57,7 +57,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh gist clone "${gist_id}" '/tmp/gist'
+            gh gist clone "https://gist.github.com/binhex/${gist_id}" '/tmp/gist'
             cp '/tmp/gist/config.ini' './configs'
       - name: Run TDB
         uses: nick-invision/retry@v2.4.0
