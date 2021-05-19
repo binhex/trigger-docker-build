@@ -18,3 +18,6 @@ jobs:
           retry_on: error
           command: |
             ls -al
+            python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --config ./configs --logs ./logs
+            ls -al ./configs
+            ls -al ./logs
