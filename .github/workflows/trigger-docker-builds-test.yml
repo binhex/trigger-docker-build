@@ -17,7 +17,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            export
+            pwd
             cd /tmp
             curl -o './github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
             tar -xvf './github-cli.tar.gz'
@@ -31,7 +31,7 @@ jobs:
           retry_on: error
           command: |
             echo "${{ secrets.CR_PAT }}" | gh auth login --with-token
-      - name: Download config from Gist
+      - name: Download config from secret Gist
         uses: nick-invision/retry@v2.4.0
         with:
           timeout_minutes: 60
@@ -39,6 +39,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
+            gh gist clone "${{ secrets.GIST_CONFIG }}" /tmp/gist
       - name: Run TDB
         uses: nick-invision/retry@v2.4.0
         with:
@@ -64,6 +65,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
+            export
             ls -al
             ls -al ./configs
             ls -al ./logs
