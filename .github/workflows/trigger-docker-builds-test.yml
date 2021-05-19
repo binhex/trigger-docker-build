@@ -17,6 +17,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
+            export
             cd /tmp
             curl -o './github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
             tar -xvf './github-cli.tar.gz'
