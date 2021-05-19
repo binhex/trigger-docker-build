@@ -40,8 +40,8 @@ jobs:
           command: |
             config_file='trigger-docker-build-config'
             gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file}" | awk -F ' ' '{ print $1 }')
-            echo "${gist_id}"
-        id: gist_id
+            echo "##[set-output name=gist_id;]$(echo ${gist_id})"
+        id: get_gist
       - name: Change directory to workspace
         uses: nick-invision/retry@v2.4.0
         with:
@@ -59,8 +59,8 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            echo "id is '${{ steps.gist_id }}'"+
-            gh gist clone "https://gist.github.com/binhex/${{ steps.gist_id }}" '/tmp/gist'
+            echo "id is '${{ steps.get_gist.outputs.gist_id }}'"
+            gh gist clone "https://gist.github.com/binhex/${{ steps.get_gist.outputs.gist_id }}" '/tmp/gist'
             cp '/tmp/gist/config.ini' './configs'
       - name: Run TDB
         uses: nick-invision/retry@v2.4.0
