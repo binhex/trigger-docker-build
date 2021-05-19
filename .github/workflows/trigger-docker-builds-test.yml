@@ -9,7 +9,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Run Python
+      - name: Download and unpack GitHub CLI
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+            curl -o '/tmp/github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
+            tar -xvf '/tmp/github-cli.tar.gz'
+            cp /tmp/gh*linux_amd64/bin/gh '/usr/local/bin/'
+      - name: Authenticate with GitHub for private Gist
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+            gh auth login --with-token < /bin/echo "${CR_PAT}"
+      - name: Download config from Gist
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+      - name: Run TDB
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+            python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --config ./configs --logs ./logs
+      - name: Upload config to Gist
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 120
+          retry_on: error
+          command: |
+      - name: Debug
         uses: nick-invision/retry@v2.4.0
         with:
           timeout_minutes: 60
@@ -18,6 +63,5 @@ jobs:
           retry_on: error
           command: |
             ls -al
-            python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --config ./configs --logs ./logs
             ls -al ./configs
             ls -al ./logs
