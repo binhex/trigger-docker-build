@@ -57,6 +57,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
+            echo "url is 'https://gist.github.com/binhex/${gist_id}'"
             gh gist clone "https://gist.github.com/binhex/${gist_id}" '/tmp/gist'
             cp '/tmp/gist/config.ini' './configs'
       - name: Run TDB
