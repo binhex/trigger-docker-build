@@ -130,7 +130,20 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
     # read email config
     config_email_username = config_obj["notification"]["email_username"]
-    config_email_password = config_obj["notification"]["email_password"]
+
+    if args["email_password"]:
+
+        config_email_password = args["email_password"]
+
+    elif config_obj["notification"]["email_password"]:
+
+        config_email_password = config_obj["notification"]["email_password"]
+
+    else:
+
+        app_logger_instance.warn(u"Email notification not enabled due to missing password")
+        return 1
+
     config_email_to = config_obj["notification"]["email_to"]
 
     # construct url to docker hub build details
@@ -171,7 +184,20 @@ def notification_kodi(action, source_app_name, current_version):
 
     # read kodi config
     kodi_username = config_obj["notification"]["kodi_username"]
-    kodi_password = config_obj["notification"]["kodi_password"]
+
+    if args["kodi_password"]:
+
+        kodi_password = args["kodi_password"]
+
+    elif config_obj["notification"]["kodi_password"]:
+
+        kodi_password = config_obj["notification"]["kodi_password"]
+
+    else:
+
+        app_logger_instance.warn(u"Kodi notification not enabled due to missing password")
+        return 1
+
     kodi_hostname = config_obj["notification"]["kodi_hostname"]
     kodi_port = config_obj["notification"]["kodi_port"]
 
@@ -628,12 +654,24 @@ def soup_regex(source_site_url, user_agent_chrome):
     return 0, soup
 
 
-def monitor_sites(schedule_check_mins):
+def monitor_sites(*arguments):
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
     target_repo_owner = config_obj["general"]["target_repo_owner"]
-    target_access_token = config_obj["general"]["target_access_token"]
+
+    if args["target_access_token"]:
+
+        target_access_token = args["target_access_token"]
+
+    elif config_obj["general"]["target_access_token"]:
+
+        target_access_token = config_obj["general"]["target_access_token"]
+
+    else:
+
+        app_logger_instance.warn(u"Target Access Token is not defined via '--target-access-token' or 'config.ini'.")
+        return 1
 
     # fake being a browser
     user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
@@ -889,13 +927,17 @@ def monitor_sites(schedule_check_mins):
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
 
-            # send email notification
-            app_logger_instance.info(u"Sending email notification...")
-            notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
+            if args["email_notification"] is True:
 
-            # send kodi notification
-            app_logger_instance.info(u"Sending kodi notification...")
-            notification_kodi(action, source_app_name, current_version)
+                # send email notification
+                app_logger_instance.info(u"Sending email notification...")
+                notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
+
+            if args["kodi_notification"] is True:
+
+                # send kodi notification
+                app_logger_instance.info(u"Sending kodi notification...")
+                notification_kodi(action, source_app_name, current_version)
 
         else:
 
@@ -903,28 +945,30 @@ def monitor_sites(schedule_check_mins):
 
         app_logger_instance.info(u"Processing finished for application %s" % source_app_name)
 
-    app_logger_instance.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
-
     # write timestamp to config.ini
     config_obj["general"]["last_check"] = time.strftime("%c")
     config_obj.write()
+
+
+def ondemand_start():
+
+    app_logger_instance.info(u"Checking for version changes...")
+    monitor_sites()
 
 
 def scheduler_start():
 
     schedule_check_mins = config_obj["general"]["schedule_check_mins"]
 
-    app_logger_instance.info(u"Initial check for version changes...")
-    monitor_sites(schedule_check_mins)
-
     # now run monitor_sites function via scheduler
-    schedule.every(schedule_check_mins).minutes.do(monitor_sites, schedule_check_mins)
+    schedule.every(schedule_check_mins).minutes.do(monitor_sites)
 
     while True:
 
         try:
 
             schedule.run_pending()
+            app_logger_instance.info(u"All applications processed, waiting for next invocation in %s minutes..." % schedule_check_mins)
             time.sleep(1)
 
         except KeyboardInterrupt:
@@ -947,13 +991,19 @@ if __name__ == '__main__':
             sys.exit(2)
 
     # setup argparse description and usage, also increase spacing for help to 50
-    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--pidfile <path>] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
+    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-password <password>] [--target-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
 
     # add argparse command line flags
     commandline_parser.add_argument(u"--config", metavar=u"<path>", help=u"specify path for config file e.g. --config /opt/triggerdockerbuild/config/")
     commandline_parser.add_argument(u"--logs", metavar=u"<path>", help=u"specify path for log files e.g. --logs /opt/triggerdockerbuild/logs/")
+    commandline_parser.add_argument(u"--kodi-password", metavar=u"<password>", help=u"specify the password to access kodi e.g. --kodi-password foo")
+    commandline_parser.add_argument(u"--email-password", metavar=u"<password>", help=u"specify the email account password e.g. --email-password foo")
+    commandline_parser.add_argument(u"--target-access-token", metavar=u"<token>", help=u"specify the github personal access token e.g. --target-access-token 123456789")
     commandline_parser.add_argument(u"--pidfile", metavar=u"<path>", help=u"specify path to pidfile e.g. --pid /var/run/triggerdockerbuild/triggerdockerbuild.pid")
-    commandline_parser.add_argument(u"--daemon", action=u"store_true", help=u"run as daemonized process")
+    commandline_parser.add_argument(u"--kodi-notification", action=u"store_true", help=u"enable kodi notification e.g. --kodi-notification")
+    commandline_parser.add_argument(u"--email-notification", action=u"store_true", help=u"enable email notification e.g. --email-notification")
+    commandline_parser.add_argument(u"--schedule", action=u"store_true", help=u"enable scheduling e.g. --schedule")
+    commandline_parser.add_argument(u"--daemon", action=u"store_true", help=u"run as daemonized process e.g. --daemon")
     commandline_parser.add_argument(u"--version", action=u"version", version=version)
 
     # save arguments in dictionary
@@ -996,6 +1046,7 @@ if __name__ == '__main__':
     app_log_file = os.path.join(logs_dir, u"app.log")
 
     if not os.path.exists(logs_dir):
+
         os.makedirs(logs_dir)
 
     # create configobj instance, set config.ini file, set encoding and set configspec.ini file
@@ -1023,5 +1074,12 @@ if __name__ == '__main__':
 
         app_logger_instance.info(u"Running as a foreground process...")
 
-    # run main function
-    scheduler_start()
+    if args["schedule"] is True:
+
+        app_logger_instance.info(u"Running via schedule...")
+        scheduler_start()
+
+    else:
+
+        app_logger_instance.info(u"Running on demand...")
+        ondemand_start()
