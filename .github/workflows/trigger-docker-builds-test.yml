@@ -38,10 +38,10 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            config_file='trigger-docker-build-config'
-            gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file}" | awk -F ' ' '{ print $1 }')
+            config_file_desc='trigger-docker-build-config'
+            gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file_desc}" | awk -F ' ' '{ print $1 }')
             echo "##[set-output name=gist_id;]$(echo ${gist_id})"
-        id: get_gist
+        id: get_gist_id
       - name: Change directory to workspace
         uses: nick-invision/retry@v2.4.0
         with:
@@ -59,10 +59,10 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            echo "[debug] Gist ID is '${{ steps.get_gist.outputs.gist_id }}'"
-            gh gist clone "${{ steps.get_gist.outputs.gist_id }}" '/tmp/gist'
+            echo "[debug] Gist ID is '${{ steps.get_gist_id.outputs.gist_id }}'"
+            gh gist clone "${{ steps.get_gist_id.outputs.gist_id }}" '/tmp/gist'
             cp '/tmp/gist/config.ini' './configs'
-      - name: Run TDB
+      - name: Run Trigger Docker Builds (TDB)
         uses: nick-invision/retry@v2.4.0
         with:
           timeout_minutes: 60
@@ -70,7 +70,12 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py --config ./configs --logs ./logs
+            python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py \
+            --config ./configs \
+            --logs ./logs \
+            --email-notification \
+            --email-password "${{ secrets.EMAIL_PASSWORD }}" \
+            --target-access-token "${{ secrets.TDB_PAT }}"
       - name: Create Gist
         uses: nick-invision/retry@v2.4.0
         with:
@@ -79,8 +84,8 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh gist create --filename './configs/config.ini'
-      - name: Delete old Gist
+            gh gist create './configs/config.ini' --desc 'trigger-docker-build-config'
+      - name: Delete previous Gist
         uses: nick-invision/retry@v2.4.0
         with:
           timeout_minutes: 60
@@ -88,7 +93,7 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            gh gist delete ${{ steps.get_gist.outputs.gist_id }}
+            gh gist delete ${{ steps.get_gist_id.outputs.gist_id }}
       - name: Debug
         uses: nick-invision/retry@v2.4.0
         with:
@@ -97,9 +102,5 @@ jobs:
           retry_wait_seconds: 120
           retry_on: error
           command: |
-            pwd
-            cat './configs/config.ini'
-            export
-            ls -al
-            ls -al ./configs
-            ls -al ./logs
+            echo "[debug] file contents of config file 'config.ini' is..." && cat './configs/config.ini'
+            echo "[debug] file contents of log file 'app.log' is..." && cat './logs/app.log'
