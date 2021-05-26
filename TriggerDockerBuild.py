@@ -150,6 +150,12 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
     target_repo_owner = config_obj["general"]["target_repo_owner"]
     dockerhub_build_details = "https://hub.docker.com/r/%s/%s/builds/" % (target_repo_owner, target_repo_name)
 
+    # construct url to github workflow details
+    github_action_details = "https://github.com/%s/%s/actions" % (target_repo_owner, target_repo_name)
+
+    # construct url to github container registry details
+    github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (target_repo_owner, target_repo_name)
+
     app_logger_instance.info(u'Sending email notification...')
 
     yag = yagmail.SMTP(config_email_username, config_email_password)
@@ -167,7 +173,9 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
     if action == "trigger":
 
-        html += '''<b>Target Build URL:</b> <a href="%s">dockerhub</a><br>''' % dockerhub_build_details
+        html += '''<b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>''' % github_action_details
+        html += '''<b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>''' % github_ghcr_details
+        html += '''<b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a><br>''' % dockerhub_build_details
 
     try:
 
