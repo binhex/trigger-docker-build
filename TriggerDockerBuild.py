@@ -145,10 +145,10 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
         return 1
 
     config_email_to = config_obj["notification"]["email_to"]
+    target_repo_owner = config_obj["general"]["target_repo_owner"]
 
     # construct url to docker hub build details
-    target_repo_owner = config_obj["general"]["target_repo_owner"]
-    dockerhub_build_details = "https://hub.docker.com/r/%s/%s/builds/" % (target_repo_owner, target_repo_name)
+    dockerhub_build_details = "https://hub.docker.com/r/%s/%s/tags?page=1&ordering=last_updated&name=latest" % (target_repo_owner, target_repo_name)
 
     # construct url to github workflow details
     github_action_details = "https://github.com/%s/%s/actions" % (target_repo_owner, target_repo_name)
@@ -168,14 +168,16 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
     <b>Source Repository:</b> %s<br>
     <b>Source App Name:</b> %s<br>
     <b>Source Site URL:</b>  <a href="%s">%s</a><br>
-    <b>Target Repository:</b> %s<br>
-    ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name, target_repo_name)
+    ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
 
     if action == "trigger":
 
-        html += '''<b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>''' % github_action_details
-        html += '''<b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>''' % github_ghcr_details
-        html += '''<b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a><br>''' % dockerhub_build_details
+        html += '''
+        <b>Target Repository:</b> %s<br>
+        <b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>
+        <b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>
+        <b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a><br>
+        ''' % (target_repo_name, github_action_details, github_ghcr_details, dockerhub_build_details)
 
     try:
 
