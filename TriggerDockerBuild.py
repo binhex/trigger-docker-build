@@ -167,7 +167,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
     <b>Source Site Name:</b> %s<br>
     <b>Source Repository:</b> %s<br>
     <b>Source App Name:</b> %s<br>
-    <b>Source Site URL:</b>  <a href="%s">%s</a><br>
+    <b>Source Site URL:</b>  <a href="%s">%s</a>
     ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
 
     if action == "trigger":
@@ -176,7 +176,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
         <b>Target Repository:</b> %s<br>
         <b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>
         <b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>
-        <b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a><br>
+        <b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a>
         ''' % (target_repo_name, github_action_details, github_ghcr_details, dockerhub_build_details)
 
     try:
