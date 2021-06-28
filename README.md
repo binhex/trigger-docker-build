@@ -5,7 +5,7 @@ TriggerDockerBuild
 A Python script to monitor GitHub, Arch Repository and Arch User Repository for version changes, if a change is identified then we create a new GitHub release which then triggers a Docker Hub build.
 
 **Features:**
-- Support for Github release or tag monitoring
+- Support for Github release or tag monitoring.
 - Arch Official Repository (AOR) monitoring
 - Arch User Repository (AUR) monitoring
 - Support for trigger or notify actions
