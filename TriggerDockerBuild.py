@@ -362,7 +362,7 @@ def http_client(**kwargs):
     except requests.exceptions.ConnectTimeout as content:
 
         # connect timeout occurred
-        app_logger_instance.warning(u"Connection timed for URL %s with error %s" % (url, content))
+        app_logger_instance.warning(u"Connection timeout for URL %s with error %s" % (url, content))
         return 1, status_code, content
 
     except requests.exceptions.ConnectionError as content:
@@ -377,9 +377,14 @@ def http_client(**kwargs):
         app_logger_instance.warning(u"Too many retries for URL %s with error %s" % (url, content))
         return 1, status_code, content
 
-    except requests.exceptions.HTTPError:
+    except requests.exceptions.HTTPError as content:
 
         # catch http exceptions thrown by requests
+        return 1, status_code, content
+
+    except requests.exceptions.ReadTimeout as content:
+        # too many redirects, bad site or circular redirect
+        app_logger_instance.warning(u"Read timeout for URL %s with error %s" % (url, content))
         return 1, status_code, content
 
     except requests.exceptions.RequestException as content:
