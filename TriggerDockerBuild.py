@@ -291,7 +291,7 @@ def http_client(**kwargs):
     connect_timeout = 10.0
 
     # set read timeout value (max time to wait between each byte)
-    read_timeout = 5.0
+    read_timeout = 10.0
 
     # use a session instance to customize how "requests" handles making http requests
     session = requests.Session()
