@@ -689,7 +689,7 @@ def monitor_sites(*arguments):
         return 1
 
     # fake being a browser
-    user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36"
+    user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
