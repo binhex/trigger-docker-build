@@ -307,7 +307,7 @@ def http_client(**kwargs):
 
         session.headers = {
             'Accept-encoding': 'gzip',
-            'User-Agent': user_agent,
+            'User-Agent': user_agent
         }
 
         if "additional_header" in kwargs:
