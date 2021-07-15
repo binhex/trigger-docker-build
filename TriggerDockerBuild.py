@@ -288,10 +288,10 @@ def http_client(**kwargs):
         return 1, None, None
 
     # set connection timeout value (max time to wait for connection)
-    connect_timeout = 60.0
+    connect_timeout = 5.0
 
     # set read timeout value (max time to wait between each byte)
-    read_timeout = 60.0
+    read_timeout = 5.0
 
     # use a session instance to customize how "requests" handles making http requests
     session = requests.Session()
@@ -689,7 +689,7 @@ def monitor_sites(*arguments):
         return 1
 
     # fake being a browser
-    user_agent_chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
+    user_agent_chrome = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'}
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
