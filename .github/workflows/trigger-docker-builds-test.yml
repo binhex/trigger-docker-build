@@ -15,7 +15,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             cd /tmp
             curl -o './github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
@@ -27,7 +26,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             echo "${{ secrets.TDB_PAT }}" | gh auth login --with-token
       - name: Get Gist ID
@@ -36,7 +34,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             config_file_desc='trigger-docker-build-config'
             gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file_desc}" | awk -F ' ' '{ print $1 }')
@@ -48,7 +45,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             cd "${GITHUB_WORKSPACE}"
       - name: Download config from secret Gist
@@ -57,7 +53,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             echo "[debug] Gist ID is '${{ steps.get_gist_id.outputs.gist_id }}'"
             gh gist clone "${{ steps.get_gist_id.outputs.gist_id }}" '/tmp/gist'
@@ -68,7 +63,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py \
             --config ./configs \
@@ -82,7 +76,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             gh gist create './configs/config.ini' --desc 'trigger-docker-build-config'
       - name: Delete previous Gist
@@ -91,7 +84,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             gh gist delete ${{ steps.get_gist_id.outputs.gist_id }}
       - name: Debug
@@ -100,7 +92,6 @@ jobs:
           timeout_minutes: 60
           max_attempts: 3
           retry_wait_seconds: 120
-          retry_on: error
           command: |
             echo "[debug] file contents of config file 'config.ini' is..." && cat './configs/config.ini'
             echo "[debug] file contents of log file 'app.log' is..." && cat './logs/app.log'
