@@ -401,7 +401,7 @@ def http_client(**kwargs):
             return 0, status_code, content
 
 
-def github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
+def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
 
     # remove illegal characters from version (github does not allow certain chars for release name)
     current_version = re.sub(ur":", ur".", current_version, flags=re.IGNORECASE)
@@ -413,7 +413,7 @@ def github_create_release(current_version, target_repo_owner, target_repo_name, 
     github_release_body = github_tag_name
     request_type = "post"
     http_url = 'https://api.github.com/repos/%s/%s/releases' % (target_repo_owner, target_repo_name)
-    data_payload = '{"tag_name": "%s", "target_commitish": "master", "name": "%s", "body": "%s", "draft": false, "prerelease": false}' % (github_tag_name, github_release_name, github_release_body)
+    data_payload = '{"tag_name": "%s", "target_commitish": "%s", "name": "%s", "body": "%s", "draft": false, "prerelease": false}' % (github_tag_name, target_repo_branch, github_release_name, github_release_body)
 
     # process post request
     return_code, status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type, data_payload=data_payload)
@@ -700,10 +700,16 @@ def monitor_sites(*arguments):
         source_branch_name = site_item.get("source_branch_name")
         target_release_days = site_item.get("target_release_days")
         target_repo_name = site_item.get("target_repo_name")
+        target_repo_branch = site_item.get("target_repo_branch")
         source_query_type = site_item.get("source_query_type")
         grace_period_mins = site_item.get("grace_period_mins")
         source_version_change_datetime = site_item.get("source_version_change_datetime")
         action = site_item.get("action")
+
+        # if target branch not defined then assume 'master' branch
+        if target_repo_branch is None:
+
+            target_repo_branch = "master"
 
         app_logger_instance.info(u"-------------------------------------")
         app_logger_instance.info(u"Processing started for application %s..." % source_app_name)
@@ -905,7 +911,7 @@ def monitor_sites(*arguments):
                         continue
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
-                return_code, status_code, content = github_create_release(current_version, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
+                return_code, status_code, content = github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
 
                 if status_code == 201:
 
