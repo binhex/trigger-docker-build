@@ -305,10 +305,11 @@ def http_client(**kwargs):
         # define dict of common arguments for requests
         requests_data_dict = {'url': url, 'timeout': (connect_timeout, read_timeout), 'allow_redirects': True, 'verify': False}
 
-        session.headers = {
+        # define default headers to compress and fake user agent
+        session.headers.update({
             'Accept-encoding': 'gzip',
             'User-Agent': user_agent
-        }
+        })
 
         if "additional_header" in kwargs:
 
@@ -688,8 +689,8 @@ def monitor_sites(*arguments):
         app_logger_instance.warn(u"Target Access Token is not defined via '--target-access-token' or 'config.ini'.")
         return 1
 
-    # fake being a browser
-    user_agent_chrome = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+    # pretend to be windows 10 running chrome (required for minecraft bedrock)
+    user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4619.2 Safari/537.36'
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
