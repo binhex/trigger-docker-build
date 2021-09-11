@@ -765,7 +765,7 @@ def monitor_sites(*arguments):
                     url_line = soup.select('a[data-platform="serverBedrockLinux"]')
                     download_url = url_line[0]['href']
 
-                except IndexError:
+                except (IndexError, KeyError):
 
                     app_logger_instance.warning(u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
                     continue
@@ -775,7 +775,7 @@ def monitor_sites(*arguments):
                     # get app version from soup
                     current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
 
-                except IndexError:
+                except (IndexError, KeyError):
 
                     request_type = "get"
                     github_fallback_version_url = "https://raw.githubusercontent.com/ich777/docker-minecraft-bedrock/master/version"
@@ -806,7 +806,7 @@ def monitor_sites(*arguments):
                     url_line = soup.select('a[aria-label="mincraft version"]')[0]
                     download_url = url_line['href']
 
-                except IndexError:
+                except (IndexError, KeyError):
 
                     app_logger_instance.debug(u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name)
 
@@ -819,7 +819,7 @@ def monitor_sites(*arguments):
                     # get app version from soup
                     current_version = re.search(r"[\d]+[\d.]+(?=.jar)", url_line_string).group()
 
-                except IndexError:
+                except (IndexError, KeyError):
 
                     app_logger_instance.warning(u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
                     continue
