@@ -64,7 +64,7 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 120
           command: |
-            python2 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py \
+            python3 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py \
             --config ./configs \
             --logs ./logs \
             --email-notification \

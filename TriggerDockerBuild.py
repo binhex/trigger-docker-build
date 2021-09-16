@@ -141,7 +141,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
     else:
 
-        app_logger_instance.warn(u"Email notification not enabled due to missing password")
+        app_logger_instance.warning(u"Email notification not enabled due to missing password")
         return 1
 
     config_email_to = config_obj["notification"]["email_to"]
@@ -205,7 +205,7 @@ def notification_kodi(action, source_app_name, current_version):
 
     else:
 
-        app_logger_instance.warn(u"Kodi notification not enabled due to missing password")
+        app_logger_instance.warning(u"Kodi notification not enabled due to missing password")
         return 1
 
     kodi_hostname = config_obj["notification"]["kodi_hostname"]
@@ -298,7 +298,6 @@ def http_client(**kwargs):
 
     # set status_code and content to None in case nothing returned
     status_code = None
-    content = None
 
     try:
 
@@ -405,7 +404,7 @@ def http_client(**kwargs):
 def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
 
     # remove illegal characters from version (github does not allow certain chars for release name)
-    current_version = re.sub(ur":", ur".", current_version, flags=re.IGNORECASE)
+    current_version = re.sub(r":", r".", current_version, flags=re.IGNORECASE)
 
     app_logger_instance.info(u"Creating Release on GitHub for version %s..." % current_version)
 
@@ -670,7 +669,7 @@ def soup_regex(source_site_url, user_agent_chrome):
     return 0, soup
 
 
-def monitor_sites(*arguments):
+def monitor_sites():
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
@@ -686,7 +685,7 @@ def monitor_sites(*arguments):
 
     else:
 
-        app_logger_instance.warn(u"Target Access Token is not defined via '--target-access-token' or 'config.ini'.")
+        app_logger_instance.warning(u"Target Access Token is not defined via '--target-access-token' or 'config.ini'.")
         return 1
 
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
@@ -779,7 +778,7 @@ def monitor_sites(*arguments):
 
                     request_type = "get"
                     github_fallback_version_url = "https://raw.githubusercontent.com/ich777/docker-minecraft-bedrock/master/version"
-                    return_code, status_code, content = http_client(url=github_fallback_version_url,user_agent=user_agent_chrome,request_type=request_type)
+                    return_code, status_code, content = http_client(url=github_fallback_version_url, user_agent=user_agent_chrome, request_type=request_type)
 
                     if return_code != 0:
 
@@ -804,16 +803,14 @@ def monitor_sites(*arguments):
 
                     # get download url from soup
                     url_line = soup.select('a[aria-label="mincraft version"]')[0]
-                    download_url = url_line['href']
 
                 except (IndexError, KeyError):
 
                     app_logger_instance.debug(u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name)
+                    continue
 
                 try:
 
-                    # get download url from soup
-                    url_line = soup.select('a[aria-label="mincraft version"]')[0]
                     url_line_string = str(url_line)
 
                     # get app version from soup
@@ -1032,7 +1029,7 @@ if __name__ == '__main__':
     args = vars(commandline_parser.parse_args())
 
     # set path to root folder for application
-    app_root_dir = os.path.dirname(os.path.realpath(__file__)).decode("utf-8")
+    app_root_dir = os.path.dirname(os.path.realpath(__file__))
 
     # set path for configspec.ini file
     configspec_ini = os.path.join(app_root_dir, u"configs/configspec.ini")
