@@ -795,7 +795,7 @@ def monitor_sites():
                 try:
 
                     # get download url from soup
-                    url_line = soup.select('a[data-platform="serverBedrockLinuxdfgdfsf"]')
+                    url_line = soup.select('a[data-platform="serverBedrockLinux"]')
                     download_url = url_line[0]['href']
 
                 except (IndexError, KeyError):
