@@ -194,14 +194,14 @@ def notification_email(**kwargs):
         <b>Source Site URL:</b>  <a href="%s">%s</a>
         ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
 
-    if action == "trigger":
+        if action == "trigger":
 
-        html += '''
-        <b>Target Repository:</b> %s<br>
-        <b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>
-        <b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>
-        <b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a>
-        ''' % (target_repo_name, github_action_details, github_ghcr_details, dockerhub_build_details)
+            html += '''
+            <b>Target Repository:</b> %s<br>
+            <b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>
+            <b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>
+            <b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a>
+            ''' % (target_repo_name, github_action_details, github_ghcr_details, dockerhub_build_details)
 
     try:
 
@@ -697,6 +697,12 @@ def soup_regex(source_site_url, user_agent_chrome):
 
 def monitor_sites():
 
+    def helper_email_error_notification():
+
+        if args["email_notification"] is True:
+
+            notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
     target_repo_owner = config_obj["general"]["target_repo_owner"]
@@ -771,8 +777,7 @@ def monitor_sites():
 
                 action = "error"
                 error_msg = u"Unable to identify current version of '%s' repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                if args["email_notification"] is True:
-                    notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                helper_email_error_notification()
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -787,8 +792,7 @@ def monitor_sites():
 
                     action = "error"
                     error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
-                    if args["email_notification"] is True:
-                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    helper_email_error_notification()
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -802,8 +806,7 @@ def monitor_sites():
 
                     action = "error"
                     error_msg = u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name
-                    if args["email_notification"] is True:
-                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    helper_email_error_notification()
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -822,8 +825,7 @@ def monitor_sites():
 
                         action = "error"
                         error_msg = u"Unable to identify app version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
-                        if args["email_notification"] is True:
-                            notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                        helper_email_error_notification()
                         app_logger_instance.warning(error_msg)
                         continue
 
@@ -840,8 +842,7 @@ def monitor_sites():
 
                     action = "error"
                     error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
-                    if args["email_notification"] is True:
-                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    helper_email_error_notification()
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -854,8 +855,7 @@ def monitor_sites():
 
                     action = "error"
                     error_msg = u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name
-                    if args["email_notification"] is True:
-                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    helper_email_error_notification()
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -870,8 +870,7 @@ def monitor_sites():
 
                     action = "error"
                     error_msg = u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
-                    if args["email_notification"] is True:
-                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    helper_email_error_notification()
                     app_logger_instance.warning(error_msg)
                     continue
 
