@@ -126,7 +126,18 @@ def app_logging():
     return {'logger': app_logger, 'handler': app_rotatingfilehandler}
 
 
-def notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version):
+def notification_email(**kwargs):
+
+    # unpack arguments from dictionary
+    action = kwargs.get("action")
+    source_app_name = kwargs.get("source_app_name")
+    source_repo_name = kwargs.get("source_repo_name")
+    source_site_name = kwargs.get("source_site_name")
+    source_site_url = kwargs.get("source_site_url")
+    target_repo_name = kwargs.get("target_repo_name")
+    previous_version = kwargs.get("previous_version")
+    current_version = kwargs.get("current_version")
+    error_msg = kwargs.get("error_msg")
 
     # read email config
     config_email_username = config_obj["notification"]["email_username"]
@@ -145,30 +156,43 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
         return 1
 
     config_email_to = config_obj["notification"]["email_to"]
-    target_repo_owner = config_obj["general"]["target_repo_owner"]
 
-    # construct url to docker hub build details
-    dockerhub_build_details = "https://hub.docker.com/r/%s/%s/tags?page=1&ordering=last_updated&name=latest" % (target_repo_owner, target_repo_name)
+    if action == "error":
 
-    # construct url to github workflow details
-    github_action_details = "https://github.com/%s/%s/actions" % (target_repo_owner, target_repo_name)
+        yag = yagmail.SMTP(config_email_username, config_email_password)
+        subject = '%s error occurred' % source_app_name
+        html = '''
+        <b>Error Message:</b> %s<br>
+        <b>Source Site Name:</b> %s<br>
+        <b>Source Repository:</b> %s<br>
+        <b>Source App Name:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a>
+        ''' % (error_msg, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
 
-    # construct url to github container registry details
-    github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (target_repo_owner, target_repo_name)
+    else:
 
-    app_logger_instance.info(u'Sending email notification...')
+        target_repo_owner = config_obj["general"]["target_repo_owner"]
 
-    yag = yagmail.SMTP(config_email_username, config_email_password)
-    subject = '%s [%s] - updated to %s' % (source_app_name, action, current_version)
-    html = '''
-    <b>Action:</b> %s<br>
-    <b>Previous Version:</b> %s<br>
-    <b>Current Version:</b> %s<br>
-    <b>Source Site Name:</b> %s<br>
-    <b>Source Repository:</b> %s<br>
-    <b>Source App Name:</b> %s<br>
-    <b>Source Site URL:</b>  <a href="%s">%s</a>
-    ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
+        # construct url to docker hub build details
+        dockerhub_build_details = "https://hub.docker.com/r/%s/%s/tags?page=1&ordering=last_updated&name=latest" % (target_repo_owner, target_repo_name)
+
+        # construct url to github workflow details
+        github_action_details = "https://github.com/%s/%s/actions" % (target_repo_owner, target_repo_name)
+
+        # construct url to github container registry details
+        github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (target_repo_owner, target_repo_name)
+
+        yag = yagmail.SMTP(config_email_username, config_email_password)
+        subject = '%s [%s] - updated to %s' % (source_app_name, action, current_version)
+        html = '''
+        <b>Action:</b> %s<br>
+        <b>Previous Version:</b> %s<br>
+        <b>Current Version:</b> %s<br>
+        <b>Source Site Name:</b> %s<br>
+        <b>Source Repository:</b> %s<br>
+        <b>Source App Name:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a>
+        ''' % (action, previous_version, current_version, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
 
     if action == "trigger":
 
@@ -181,6 +205,7 @@ def notification_email(action, source_app_name, source_repo_name, source_site_na
 
     try:
 
+        app_logger_instance.info(u'Sending email notification...')
         yag.send(to=config_email_to, subject=subject, contents=[html])
 
     except Exception:
@@ -217,6 +242,7 @@ def notification_kodi(action, source_app_name, current_version):
     # send gui notification
     try:
 
+        app_logger_instance.info(u'Sending kodi notification...')
         kodi.GUI.ShowNotification({"title": "TriggerDockerBuild", "message": "%s [%s] - updated to %s" % (source_app_name, action, current_version)})
 
     except Exception:
@@ -743,7 +769,11 @@ def monitor_sites():
 
             if return_code != 0:
 
-                app_logger_instance.warning(u"Unable to identify current version of %s repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name))
+                action = "error"
+                error_msg = u"Unable to identify current version of '%s' repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                if args["email_notification"] is True:
+                    notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                app_logger_instance.warning(error_msg)
                 continue
 
         elif source_site_name == "regex":
@@ -755,18 +785,26 @@ def monitor_sites():
 
                 if return_code != 0:
 
-                    app_logger_instance.info(u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url)
+                    action = "error"
+                    error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
+                    if args["email_notification"] is True:
+                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    app_logger_instance.warning(error_msg)
                     continue
 
                 try:
 
                     # get download url from soup
-                    url_line = soup.select('a[data-platform="serverBedrockLinux"]')
+                    url_line = soup.select('a[data-platform="serverBedrockLinuxdfgdfsf"]')
                     download_url = url_line[0]['href']
 
                 except (IndexError, KeyError):
 
-                    app_logger_instance.warning(u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
+                    action = "error"
+                    error_msg = u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name
+                    if args["email_notification"] is True:
+                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    app_logger_instance.warning(error_msg)
                     continue
 
                 try:
@@ -782,7 +820,11 @@ def monitor_sites():
 
                     if return_code != 0:
 
-                        app_logger_instance.warning(u"Unable to identify app version using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
+                        action = "error"
+                        error_msg = u"Unable to identify app version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
+                        if args["email_notification"] is True:
+                            notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                        app_logger_instance.warning(error_msg)
                         continue
 
                     else:
@@ -796,7 +838,11 @@ def monitor_sites():
 
                 if return_code != 0:
 
-                    app_logger_instance.info(u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url)
+                    action = "error"
+                    error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
+                    if args["email_notification"] is True:
+                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    app_logger_instance.warning(error_msg)
                     continue
 
                 try:
@@ -806,7 +852,11 @@ def monitor_sites():
 
                 except (IndexError, KeyError):
 
-                    app_logger_instance.debug(u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name)
+                    action = "error"
+                    error_msg = u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name
+                    if args["email_notification"] is True:
+                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    app_logger_instance.warning(error_msg)
                     continue
 
                 try:
@@ -818,7 +868,11 @@ def monitor_sites():
 
                 except (IndexError, KeyError):
 
-                    app_logger_instance.warning(u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name)
+                    action = "error"
+                    error_msg = u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
+                    if args["email_notification"] is True:
+                        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    app_logger_instance.warning(error_msg)
                     continue
 
             else:
@@ -948,14 +1002,10 @@ def monitor_sites():
 
             if args["email_notification"] is True:
 
-                # send email notification
-                app_logger_instance.info(u"Sending email notification...")
-                notification_email(action, source_app_name, source_repo_name, source_site_name, source_site_url, target_repo_name, previous_version, current_version)
+                notification_email(action=action, source_app_name=source_app_name, source_repo_name=source_repo_name, source_site_name=source_site_name, source_site_url=source_site_url, target_repo_name=target_repo_name, previous_version=previous_version, current_version=current_version)
 
             if args["kodi_notification"] is True:
 
-                # send kodi notification
-                app_logger_instance.info(u"Sending kodi notification...")
                 notification_kodi(action, source_app_name, current_version)
 
         else:
