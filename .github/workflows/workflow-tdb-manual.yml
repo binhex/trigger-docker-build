@@ -1,4 +1,4 @@
-name: trigger-docker-builds-test
+name: workflow-tdb-manual
 
 on:
   workflow_dispatch:

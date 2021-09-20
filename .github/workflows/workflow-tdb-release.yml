@@ -1,4 +1,4 @@
-name: trigger-docker-builds-prod
+name: workflow-tdb-release
 
 on:
   schedule:
