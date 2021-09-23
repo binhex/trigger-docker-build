@@ -1,8 +1,9 @@
-name: workflow-tdb-release
+name: workflow-tdb-schedule
 
 on:
   schedule:
-  - cron: "*/30 * * * *"
+    # run every 30 minutes
+    - cron: "*/30 * * * *"
 
 jobs:
   run-tdb:
