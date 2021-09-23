@@ -197,11 +197,11 @@ def notification_email(**kwargs):
         if action == "trigger":
 
             html += '''
-            <b>Target Repository:</b> %s<br>
-            <b>Target Github Action URL:</b> <a href="%s">github-workflow</a><br>
-            <b>Target Github Container Registry URL:</b> <a href="%s">github-registry</a><br>
-            <b>Target Docker Hub URL:</b> <a href="%s">dockerhub</a>
-            ''' % (target_repo_name, github_action_details, github_ghcr_details, dockerhub_build_details)
+            <b>Target Repository URL:</b> <a href="https://github.com/%s/%s">github repo</a><br>
+            <b>Target Github Action URL:</b> <a href="%s">github workflow</a><br>
+            <b>Target Github Container Registry URL:</b> <a href="%s">github registry</a><br>
+            <b>Target Docker Hub Registry URL:</b> <a href="%s">dockerhub registry</a>
+            ''' % (target_repo_owner, target_repo_name, github_action_details, github_ghcr_details, dockerhub_build_details)
 
     try:
 
