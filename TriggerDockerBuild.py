@@ -160,14 +160,13 @@ def notification_email(**kwargs):
     if action == "error":
 
         yag = yagmail.SMTP(config_email_username, config_email_password)
-        subject = '%s error occurred' % source_app_name
+        subject = '%s [%s] - error occurred' % (source_app_name, action)
         html = '''
         <b>Error Message:</b> %s<br>
         <b>Source Site Name:</b> %s<br>
         <b>Source Repository:</b> %s<br>
-        <b>Source App Name:</b> %s<br>
         <b>Source Site URL:</b>  <a href="%s">%s</a>
-        ''' % (error_msg, source_site_name, source_repo_name, source_app_name, source_site_url, source_site_name)
+        ''' % (error_msg, source_site_name, source_repo_name, source_site_url, source_app_name)
 
     else:
 
