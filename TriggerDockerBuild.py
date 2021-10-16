@@ -721,6 +721,11 @@ def monitor_sites():
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
     user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4619.2 Safari/537.36'
 
+    # set site fail counts
+    github_fail_count = 0
+    aor_fail_count = 0
+    aur_fail_count = 0
+
     # loop over each site and check previous and current result
     for site_item in config_site_list:
 
@@ -746,14 +751,28 @@ def monitor_sites():
 
         if source_site_name == "github":
 
+            if github_fail_count == 3:
+
+                app_logger_instance.warning(u"GitHub Site has 3 failures, assuming GitHub site is down thus skipping all GitHub packages")
+                continue
+
             return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name)
 
             if return_code != 0:
 
-                app_logger_instance.warning(u"Unable to identify release, tag, or commit for repo '%s', skipping to next iteration..." % source_repo_name)
+                action = "error"
+                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                github_fail_count = github_fail_count + 1
+                helper_email_error_notification()
+                app_logger_instance.warning(error_msg)
                 continue
 
         elif source_site_name == "aor":
+
+            if aor_fail_count == 3:
+
+                app_logger_instance.warning(u"AOR Site has 3 failures, assuming AOR site is down thus skipping all AOR packages")
+                continue
 
             # if grace period not defined then set to default value (required for aor)
             if grace_period_mins is None:
@@ -764,17 +783,27 @@ def monitor_sites():
 
             if return_code != 0:
 
-                app_logger_instance.warning(u"Unable to identify current version of %s repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name))
+                action = "error"
+                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                aor_fail_count = aor_fail_count + 1
+                helper_email_error_notification()
+                app_logger_instance.warning(error_msg)
                 continue
 
         elif source_site_name == "aur":
+
+            if aur_fail_count == 3:
+
+                app_logger_instance.warning(u"AUR Site has 3 failures, assuming AUR site is down thus skipping all AUR packages")
+                continue
 
             return_code, current_version, source_site_url = aur_apps(source_app_name, user_agent_chrome)
 
             if return_code != 0:
 
                 action = "error"
-                error_msg = u"Unable to identify current version of '%s' repo for app '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                aur_fail_count = aur_fail_count + 1
                 helper_email_error_notification()
                 app_logger_instance.warning(error_msg)
                 continue
