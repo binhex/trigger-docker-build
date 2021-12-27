@@ -741,13 +741,17 @@ def monitor_sites():
         source_version_change_datetime = site_item.get("source_version_change_datetime")
         action = site_item.get("action")
 
-        # if target branch not defined then assume 'master' branch
-        if target_repo_branch is None:
-
-            target_repo_branch = "master"
-
         app_logger_instance.info(u"-------------------------------------")
         app_logger_instance.info(u"Processing started for application %s..." % source_app_name)
+
+        # if target branch not defined then send email notification and skip to next item
+        if target_repo_branch is None:
+
+            action = "error"
+            error_msg = u"Target repo branch not defined for target repo '%s', skipping to next iteration..." % target_repo_name
+            helper_email_error_notification()
+            app_logger_instance.warning(error_msg)
+            continue
 
         if source_site_name == "github":
 
