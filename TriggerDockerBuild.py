@@ -128,6 +128,11 @@ def app_logging():
 
 def notification_email(**kwargs):
 
+    if not email_notification:
+
+        app_logger_instance.info(u"Email notification not enabled")
+        return 1
+
     # unpack arguments from dictionary
     action = kwargs.get("action")
     source_app_name = kwargs.get("source_app_name")
@@ -141,25 +146,11 @@ def notification_email(**kwargs):
 
     # read email config
     config_email_username = config_obj["notification"]["email_username"]
-
-    if args["email_password"]:
-
-        config_email_password = args["email_password"]
-
-    elif config_obj["notification"]["email_password"]:
-
-        config_email_password = config_obj["notification"]["email_password"]
-
-    else:
-
-        app_logger_instance.warning(u"Email notification not enabled due to missing password")
-        return 1
-
     config_email_to = config_obj["notification"]["email_to"]
 
     if action == "error":
 
-        yag = yagmail.SMTP(config_email_username, config_email_password)
+        yag = yagmail.SMTP(config_email_username, email_password)
         subject = '%s [%s] - error occurred' % (source_app_name, action)
         html = '''
         <b>Error Message:</b> %s<br>
@@ -181,7 +172,7 @@ def notification_email(**kwargs):
         # construct url to github container registry details
         github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (target_repo_owner, target_repo_name)
 
-        yag = yagmail.SMTP(config_email_username, config_email_password)
+        yag = yagmail.SMTP(config_email_username, email_password)
         subject = '%s [%s] - updated to %s' % (source_app_name, action, current_version)
         html = '''
         <b>Action:</b> %s<br>
@@ -215,22 +206,13 @@ def notification_email(**kwargs):
 # noinspection PyUnresolvedReferences
 def notification_kodi(action, source_app_name, current_version):
 
-    # read kodi config
-    kodi_username = config_obj["notification"]["kodi_username"]
+    if not kodi_notification:
 
-    if args["kodi_password"]:
-
-        kodi_password = args["kodi_password"]
-
-    elif config_obj["notification"]["kodi_password"]:
-
-        kodi_password = config_obj["notification"]["kodi_password"]
-
-    else:
-
-        app_logger_instance.warning(u"Kodi notification not enabled due to missing password")
+        app_logger_instance.info(u"Kodi notification not enabled")
         return 1
 
+    # read kodi config
+    kodi_username = config_obj["notification"]["kodi_username"]
     kodi_hostname = config_obj["notification"]["kodi_hostname"]
     kodi_port = config_obj["notification"]["kodi_port"]
 
@@ -697,26 +679,11 @@ def monitor_sites():
 
     def helper_email_error_notification():
 
-        if args["email_notification"] is True:
-
-            notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
     target_repo_owner = config_obj["general"]["target_repo_owner"]
-
-    if args["target_access_token"]:
-
-        target_access_token = args["target_access_token"]
-
-    elif config_obj["general"]["target_access_token"]:
-
-        target_access_token = config_obj["general"]["target_access_token"]
-
-    else:
-
-        app_logger_instance.warning(u"Target Access Token is not defined via '--target-access-token' or 'config.ini'.")
-        return 1
 
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
     user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4619.2 Safari/537.36'
@@ -740,6 +707,10 @@ def monitor_sites():
         grace_period_mins = site_item.get("grace_period_mins")
         source_version_change_datetime = site_item.get("source_version_change_datetime")
         action = site_item.get("action")
+
+        # set default values in case they are not supplied
+        source_site_url = None
+        error_msg = None
 
         app_logger_instance.info(u"-------------------------------------")
         app_logger_instance.info(u"Processing started for application %s..." % source_app_name)
@@ -1030,13 +1001,9 @@ def monitor_sites():
             config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
             config_obj.write()
 
-            if args["email_notification"] is True:
+            notification_email(action=action, source_app_name=source_app_name, source_repo_name=source_repo_name, source_site_name=source_site_name, source_site_url=source_site_url, target_repo_name=target_repo_name, previous_version=previous_version, current_version=current_version)
 
-                notification_email(action=action, source_app_name=source_app_name, source_repo_name=source_repo_name, source_site_name=source_site_name, source_site_url=source_site_url, target_repo_name=target_repo_name, previous_version=previous_version, current_version=current_version)
-
-            if args["kodi_notification"] is True:
-
-                notification_kodi(action, source_app_name, current_version)
+            notification_kodi(action, source_app_name, current_version)
 
         else:
 
@@ -1079,7 +1046,7 @@ def scheduler_start():
 # required to prevent separate process from trying to load parent process
 if __name__ == '__main__':
 
-    version = "1.1.0"
+    version = "1.2.0"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
@@ -1098,9 +1065,9 @@ if __name__ == '__main__':
     commandline_parser.add_argument(u"--kodi-password", metavar=u"<password>", help=u"specify the password to access kodi e.g. --kodi-password foo")
     commandline_parser.add_argument(u"--email-password", metavar=u"<password>", help=u"specify the email account password e.g. --email-password foo")
     commandline_parser.add_argument(u"--target-access-token", metavar=u"<token>", help=u"specify the github personal access token e.g. --target-access-token 123456789")
-    commandline_parser.add_argument(u"--pidfile", metavar=u"<path>", help=u"specify path to pidfile e.g. --pid /var/run/triggerdockerbuild/triggerdockerbuild.pid")
     commandline_parser.add_argument(u"--kodi-notification", action=u"store_true", help=u"enable kodi notification e.g. --kodi-notification")
     commandline_parser.add_argument(u"--email-notification", action=u"store_true", help=u"enable email notification e.g. --email-notification")
+    commandline_parser.add_argument(u"--pidfile", metavar=u"<path>", help=u"specify path to pidfile e.g. --pid /var/run/triggerdockerbuild/triggerdockerbuild.pid")
     commandline_parser.add_argument(u"--schedule", action=u"store_true", help=u"enable scheduling e.g. --schedule")
     commandline_parser.add_argument(u"--daemon", action=u"store_true", help=u"run as daemonized process e.g. --daemon")
     commandline_parser.add_argument(u"--version", action=u"version", version=version)
@@ -1158,6 +1125,71 @@ if __name__ == '__main__':
     app_log = app_logging()
     app_logger_instance = app_log.get('logger')
     app_handler = app_log.get('handler')
+
+    if args["email_notification"]:
+
+        email_notification = args["email_notification"]
+
+    elif config_obj["notification"]["email_notification"] is not None:
+
+        email_notification = config_obj["notification"]["email_notification"]
+
+    else:
+
+        app_logger_instance.info(u"Email Notification is not defined via '--email-notification' or 'config.ini', assuming True")
+        email_notification = False
+
+    if args["email_password"]:
+
+        email_password = args["email_password"]
+
+    elif config_obj["notification"]["email_password"] is not None:
+
+        email_password = config_obj["notification"]["email_password"]
+
+    else:
+
+        app_logger_instance.info(u"Email Password  is not defined via '--email-password' or 'config.ini', setting Email Notification to false")
+        email_notification = False
+
+    if args["kodi_notification"]:
+
+        kodi_notification = args["kodi_notification"]
+
+    elif config_obj["notification"]["kodi_notification"] is not None:
+
+        kodi_notification = config_obj["notification"]["kodi_notification"]
+
+    else:
+
+        app_logger_instance.info(u"Kodi Password is not defined via '--kodi-password' or 'config.ini', setting Kodi Notification to false")
+        kodi_notification = False
+
+    if args["kodi_password"]:
+
+        kodi_password = args["kodi_password"]
+
+    elif config_obj["notification"]["kodi_password"] is not None:
+
+        kodi_password = config_obj["notification"]["kodi_password"]
+
+    else:
+
+        app_logger_instance.info(u"Kodi Password is not defined via '--kodi-password' or 'config.ini', setting Kodi Notification to false")
+        kodi_notification = False
+
+    if args["target_access_token"]:
+
+        target_access_token = args["target_access_token"]
+
+    elif config_obj["general"]["target_access_token"] is not None:
+
+        target_access_token = config_obj["general"]["target_access_token"]
+
+    else:
+
+        app_logger_instance.warning(u"Target Access Token is not defined via '--target-access-token' or 'config.ini', exiting script...")
+        exit(1)
 
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
