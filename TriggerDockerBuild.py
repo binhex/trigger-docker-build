@@ -1080,9 +1080,6 @@ if __name__ == '__main__':
     # set path to root folder for application
     app_root_dir = os.path.dirname(os.path.realpath(__file__))
 
-    # set path for configspec.ini file
-    configspec_ini = os.path.join(app_root_dir, u"configs/configspec.ini")
-
     if not args["config"]:
 
         # set folder path for config files
@@ -1098,7 +1095,17 @@ if __name__ == '__main__':
 
     # create config and logs paths if they dont exist
     if not os.path.exists(config_dir):
+
         os.makedirs(config_dir)
+
+    # set path for configspec.ini file
+    configspec_ini = os.path.join(app_root_dir, u"configs/configspec.ini")
+
+    # create configobj instance, set config.ini file, set encoding and set configspec.ini file
+    config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
+
+    # create config.ini
+    create_config()
 
     if not args["logs"]:
 
@@ -1116,12 +1123,6 @@ if __name__ == '__main__':
     if not os.path.exists(logs_dir):
 
         os.makedirs(logs_dir)
-
-    # create configobj instance, set config.ini file, set encoding and set configspec.ini file
-    config_obj = configobj.ConfigObj(config_ini, list_values=False, write_empty_values=True, encoding='UTF-8', default_encoding='UTF-8', configspec=configspec_ini, unrepr=True)
-
-    # create config.ini
-    create_config()
 
     # setup logging
     app_log = app_logging()
