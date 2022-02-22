@@ -97,3 +97,5 @@ jobs:
           command: |
             echo "[debug] file contents of config file 'config.ini' is..." && cat './configs/config.ini'
             echo "[debug] file contents of log file 'app.log' is..." && cat './logs/app.log'
+      - name: Prevent GitHub from disabling sync after 60 days
+        uses: gautamkrishnar/keepalive-workflow@master
