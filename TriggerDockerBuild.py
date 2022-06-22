@@ -135,6 +135,8 @@ def notification_email(**kwargs):
 
     # unpack arguments from dictionary
     action = kwargs.get("action")
+    msg_type = kwargs.get("msg_type")
+    error_msg = kwargs.get("error_msg")
     source_app_name = kwargs.get("source_app_name")
     source_repo_name = kwargs.get("source_repo_name")
     source_site_name = kwargs.get("source_site_name")
@@ -142,22 +144,31 @@ def notification_email(**kwargs):
     target_repo_name = kwargs.get("target_repo_name")
     previous_version = kwargs.get("previous_version")
     current_version = kwargs.get("current_version")
-    error_msg = kwargs.get("error_msg")
 
     # read email config
     config_email_username = config_obj["notification"]["email_username"]
     config_email_to = config_obj["notification"]["email_to"]
 
-    if action == "error":
+    if msg_type == "site_error":
 
         yag = yagmail.SMTP(config_email_username, email_password)
-        subject = '%s [%s] - error occurred' % (source_app_name, action)
+        subject = '%s - %s' % (source_site_name, msg_type)
         html = '''
+        <b>Source Site Name:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a>
         <b>Error Message:</b> %s<br>
+        ''' % (source_site_name, source_site_url, source_site_name, error_msg)
+
+    elif msg_type == "config_error" or msg_type == "app_error":
+
+        yag = yagmail.SMTP(config_email_username, email_password)
+        subject = '%s - %s' % (source_app_name, msg_type)
+        html = '''
         <b>Source Site Name:</b> %s<br>
         <b>Source Repository:</b> %s<br>
         <b>Source Site URL:</b>  <a href="%s">%s</a>
-        ''' % (error_msg, source_site_name, source_repo_name, source_site_url, source_app_name)
+        <b>Error Message:</b> %s<br>
+        ''' % (source_site_name, source_repo_name, source_site_url, source_app_name, error_msg)
 
     else:
 
@@ -348,22 +359,22 @@ def http_client(**kwargs):
         if status_code == 401:
 
             app_logger_instance.warning(u"The status code %s indicates unauthorised access for %s, error is %s" % (status_code, url, content))
-            raise requests.exceptions.HTTPError
+            raise requests.exceptions.HTTPError(status_code, url, content)
 
         elif status_code == 404:
 
             app_logger_instance.warning(u"The status code %s indicates the requested resource could not be found  for %s, error is %s" % (status_code, url, content))
-            raise requests.exceptions.HTTPError
+            raise requests.exceptions.HTTPError(status_code, url, content)
 
         elif status_code == 422:
 
             app_logger_instance.warning(u"The status code %s indicates a request was well-formed but was unable to be followed due to semantic errors for %s, error is %s" % (status_code, url, content))
-            raise requests.exceptions.HTTPError
+            raise requests.exceptions.HTTPError(status_code, url, content)
 
         elif not 200 <= status_code <= 299:
 
             app_logger_instance.warning(u"The status code %s indicates an unexpected error for %s, error is %s" % (status_code, url, content))
-            raise requests.exceptions.HTTPError
+            raise requests.exceptions.HTTPError(status_code, url, content)
 
     except requests.exceptions.ConnectTimeout as content:
 
@@ -407,7 +418,7 @@ def http_client(**kwargs):
             return 0, status_code, content
 
 
-def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
+def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent_chrome):
 
     # remove illegal characters from version (github does not allow certain chars for release name)
     current_version = re.sub(r":", r".", current_version, flags=re.IGNORECASE)
@@ -426,7 +437,23 @@ def github_create_release(current_version, target_repo_branch, target_repo_owner
     return return_code, status_code, content
 
 
-def github_target_last_release_date(target_repo_owner, target_repo_name, target_access_token, user_agent_chrome):
+def check_site(**kwargs):
+
+    # unpack arguments from dictionary
+    url = kwargs.get("url")
+    user_agent_chrome = kwargs.get("user_agent_chrome")
+
+    # construct url to github rest api
+    request_type = "get"
+
+    # download json content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+
+    # convert the following then compare against throttle days value "2020-04-15T21:53:20Z"
+    return return_code, status_code
+
+
+def github_target_last_release_date(target_repo_owner, target_repo_name, user_agent_chrome):
 
     github_query_type = "releases/latest"
     json_query = "published_at"
@@ -446,12 +473,12 @@ def github_target_last_release_date(target_repo_owner, target_repo_name, target_
 
         except (ValueError, TypeError, KeyError):
 
-            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            app_logger_instance.info(u"Problem loading json from %s" % url)
             return 1, None
 
     else:
 
-        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        app_logger_instance.info(u"Problem downloading json content from %s" % url)
         return 1, None
 
     try:
@@ -468,7 +495,7 @@ def github_target_last_release_date(target_repo_owner, target_repo_name, target_
     return 0, target_last_release_date
 
 
-def github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name):
+def github_apps(source_app_name, source_query_type, source_repo_name, user_agent_chrome, source_branch_name):
 
     # certain github repos do not have releases, only tags, thus we need to account for these differently
     if source_query_type.lower() == "tag":
@@ -517,12 +544,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, target_acc
 
         except (ValueError, TypeError, KeyError):
 
-            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            app_logger_instance.info(u"Problem loading json from %s" % url)
             return 1, None, None
 
     else:
 
-        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        app_logger_instance.info(u"Problem downloading json content from %s" % url)
         return 1, None, None
 
     try:
@@ -577,12 +604,12 @@ def aor_apps(source_app_name, user_agent_chrome):
 
         except (ValueError, TypeError, KeyError, IndexError):
 
-            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            app_logger_instance.info(u"Problem loading json from %s" % url)
             return 1, None, None
 
     else:
 
-        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        app_logger_instance.info(u"Problem downloading json content from %s" % url)
         return 1, None, None
 
     try:
@@ -625,12 +652,12 @@ def aur_apps(source_app_name, user_agent_chrome):
 
         except (ValueError, TypeError, KeyError):
 
-            app_logger_instance.info(u"Problem loading json from %s, skipping to next iteration..." % url)
+            app_logger_instance.info(u"Problem loading json from %s" % url)
             return 1, None, None
 
     else:
 
-        app_logger_instance.info(u"Problem downloading json content from %s, skipping to new release..." % url)
+        app_logger_instance.info(u"Problem downloading json content from %s" % url)
         return 1, None, None
 
     try:
@@ -664,22 +691,18 @@ def soup_regex(source_site_url, user_agent_chrome):
 
         except (ValueError, TypeError, KeyError):
 
-            app_logger_instance.info(u"Problem extracting url using regex from url  %s, skipping to next iteration..." % source_site_url)
+            app_logger_instance.info(u"Problem extracting url using regex from url  %s" % source_site_url)
             return 1, None
 
     else:
 
-        app_logger_instance.info(u"Problem downloading webpage from url  %s, skipping to new release..." % source_site_url)
+        app_logger_instance.info(u"Problem downloading webpage from url  %s" % source_site_url)
         return 1, None
 
     return 0, soup
 
 
 def monitor_sites():
-
-    def helper_email_error_notification():
-
-        notification_email(action=action, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
@@ -688,10 +711,79 @@ def monitor_sites():
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
     user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4619.2 Safari/537.36'
 
-    # set site fail counts
-    github_fail_count = 0
-    aor_fail_count = 0
-    aur_fail_count = 0
+    # set package fail counts
+    github_fail_site_max_count = 3
+    aor_fail_site_max_count = 3
+    aur_fail_site_max_count = 3
+
+    # check github api is operational
+    url = "https://api.github.com"
+
+    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+
+    if return_code != 0:
+
+        config_obj["general"]["github_fail_site_count"] = config_obj["general"]["github_fail_site_count"] + 1
+        config_obj.write()
+
+        if config_obj["general"]["github_fail_site_count"] >= github_fail_site_max_count:
+
+            msg_type = "site_error"
+            error_msg = u"GitHub site down for '%s' subsequent retries" % github_fail_site_max_count
+            source_site_name = "GitHub"
+            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
+            app_logger_instance.warning(error_msg)
+
+    else:
+
+        config_obj["general"]["github_fail_site_count"] = 0
+        config_obj.write()
+
+    # check aor site is operational
+    url = "https://www.archlinux.org"
+
+    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+
+    if return_code != 0:
+
+        config_obj["general"]["aor_fail_site_count"] = config_obj["general"]["aor_fail_site_count"] + 1
+        config_obj.write()
+
+        if config_obj["general"]["aor_fail_site_count"] >= aor_fail_site_max_count:
+
+            msg_type = "site_error"
+            error_msg = u"AOR site down for '%s' subsequent retries" % aor_fail_site_max_count
+            source_site_name = "aor"
+            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
+            app_logger_instance.warning(error_msg)
+
+    else:
+
+        config_obj["general"]["aor_fail_site_count"] = 0
+        config_obj.write()
+
+    # check aur site is operational
+    url = "https://aur.archlinux.org"
+
+    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+
+    if return_code != 0:
+
+        config_obj["general"]["aur_fail_site_count"] = config_obj["general"]["aur_fail_site_count"] + 1
+        config_obj.write()
+
+        if config_obj["general"]["aur_fail_site_count"] >= aur_fail_site_max_count:
+
+            msg_type = "site_error"
+            error_msg = u"AUR site down for '%s' subsequent retries" % aur_fail_site_max_count
+            source_site_name = "aur"
+            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
+            app_logger_instance.warning(error_msg)
+
+    else:
+
+        config_obj["general"]["aur_fail_site_count"] = 0
+        config_obj.write()
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
@@ -720,35 +812,34 @@ def monitor_sites():
             # if target branch not defined then send email notification and skip to next item
             if target_repo_branch is None:
 
-                action = "error"
+                msg_type = "config_error"
                 error_msg = u"Target repo branch not defined for target repo '%s', skipping to next iteration..." % target_repo_name
-                helper_email_error_notification()
+                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                 app_logger_instance.warning(error_msg)
                 continue
 
         if source_site_name == "github":
 
-            if github_fail_count == 3:
+            if config_obj["general"]["github_fail_site_count"] != 0:
 
-                app_logger_instance.warning(u"GitHub Site has 3 failures, assuming GitHub site is down thus skipping all GitHub packages")
+                app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, target_access_token, user_agent_chrome, source_branch_name)
+            return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, user_agent_chrome, source_branch_name)
 
             if return_code != 0:
 
-                action = "error"
+                msg_type = "app_error"
                 error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                github_fail_count = github_fail_count + 1
-                helper_email_error_notification()
+                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                 app_logger_instance.warning(error_msg)
                 continue
 
         elif source_site_name == "aor":
 
-            if aor_fail_count == 3:
+            if config_obj["general"]["aor_fail_site_count"] != 0:
 
-                app_logger_instance.warning(u"AOR Site has 3 failures, assuming AOR site is down thus skipping all AOR packages")
+                app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
             # if grace period not defined then set to default value (required for aor)
@@ -760,28 +851,26 @@ def monitor_sites():
 
             if return_code != 0:
 
-                action = "error"
+                msg_type = "app_error"
                 error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                aor_fail_count = aor_fail_count + 1
-                helper_email_error_notification()
+                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                 app_logger_instance.warning(error_msg)
                 continue
 
         elif source_site_name == "aur":
 
-            if aur_fail_count == 3:
+            if config_obj["general"]["aur_fail_site_count"] != 0:
 
-                app_logger_instance.warning(u"AUR Site has 3 failures, assuming AUR site is down thus skipping all AUR packages")
+                app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
             return_code, current_version, source_site_url = aur_apps(source_app_name, user_agent_chrome)
 
             if return_code != 0:
 
-                action = "error"
+                msg_type = "app_error"
                 error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                aur_fail_count = aur_fail_count + 1
-                helper_email_error_notification()
+                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -794,9 +883,9 @@ def monitor_sites():
 
                 if return_code != 0:
 
-                    action = "error"
+                    msg_type = "app_error"
                     error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
-                    helper_email_error_notification()
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name,source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -808,9 +897,9 @@ def monitor_sites():
 
                 except (IndexError, KeyError):
 
-                    action = "error"
+                    msg_type = "app_error"
                     error_msg = u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name
-                    helper_email_error_notification()
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -827,9 +916,9 @@ def monitor_sites():
 
                     if return_code != 0:
 
-                        action = "error"
+                        msg_type = "app_error"
                         error_msg = u"Unable to identify app version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
-                        helper_email_error_notification()
+                        notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                         app_logger_instance.warning(error_msg)
                         continue
 
@@ -844,9 +933,9 @@ def monitor_sites():
 
                 if return_code != 0:
 
-                    action = "error"
+                    msg_type = "app_error"
                     error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
-                    helper_email_error_notification()
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -857,9 +946,9 @@ def monitor_sites():
 
                 except (IndexError, KeyError):
 
-                    action = "error"
+                    msg_type = "app_error"
                     error_msg = u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name
-                    helper_email_error_notification()
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -872,9 +961,9 @@ def monitor_sites():
 
                 except (IndexError, KeyError):
 
-                    action = "error"
+                    msg_type = "app_error"
                     error_msg = u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
-                    helper_email_error_notification()
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -939,7 +1028,7 @@ def monitor_sites():
 
                 if target_release_days:
 
-                    return_code, last_release_date = github_target_last_release_date(target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
+                    return_code, last_release_date = github_target_last_release_date(target_repo_owner, target_repo_name, user_agent_chrome)
 
                     if return_code != 0:
 
@@ -966,23 +1055,30 @@ def monitor_sites():
                         continue
 
                 app_logger_instance.info(u"Previous version %s and current version %s are different, triggering a docker hub build (via github tag)..." % (previous_version, current_version))
-                return_code, status_code, content = github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, target_access_token, user_agent_chrome)
+                return_code, status_code, content = github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent_chrome)
 
                 if status_code == 201:
 
                     app_logger_instance.info(u"Setting previous version %s to the same as current version %s after successful build" % (previous_version, current_version))
 
-                elif status_code == 422:
-
-                    app_logger_instance.warning(u"GitHub release already exists for %s/%s, overwriting current version and skipping to next iteration..." % (target_repo_owner, target_repo_name))
-                    app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
-                    config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
-                    config_obj.write()
-                    continue
-
                 else:
 
-                    app_logger_instance.warning(u"Problem creating github release and tag, skipping to next iteration...")
+                    # TODO this is a hack to work around the fact we have converted dict to keyword args
+                    regex_code = '(?<="code":\s")[^"]+'
+                    code = (re.search(regex_code, str(content))).group(0)
+
+                    if code.lower() == "already_exists":
+
+                        app_logger_instance.warning(u"Problem creating GitHub release as it already exists for '%s/%s', overwriting current version and skipping to next iteration..." % (target_repo_owner, target_repo_name))
+                        app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
+                        config_obj["results"]["%s_%s_%s_previous_version" % (
+                        source_site_name, source_app_name, target_repo_name)] = current_version
+                        config_obj.write()
+
+                    else:
+
+                        app_logger_instance.warning(u"Problem creating GitHub release due to error '%s' for '%s/%s', skipping to next iteration..." % (code, target_repo_owner, target_repo_name))
+
                     continue
 
                 if source_version_change_datetime is not None:
