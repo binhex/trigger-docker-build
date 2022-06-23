@@ -26,8 +26,6 @@ signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly 
 # TODO change input to functions as dictionary
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
 # TODO change return for function to dictionary
-# TODO add in option to throttle target builds for certain apps - such as jackett
-
 
 def create_config():
 
@@ -155,8 +153,8 @@ def notification_email(**kwargs):
         subject = '%s - %s' % (source_site_name, msg_type)
         html = '''
         <b>Source Site Name:</b> %s<br>
-        <b>Source Site URL:</b>  <a href="%s">%s</a>
-        <b>Error Message:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
+        <b>Error Message:</b> %s
         ''' % (source_site_name, source_site_url, source_site_name, error_msg)
 
     elif msg_type == "config_error" or msg_type == "app_error":
@@ -166,8 +164,8 @@ def notification_email(**kwargs):
         html = '''
         <b>Source Site Name:</b> %s<br>
         <b>Source Repository:</b> %s<br>
-        <b>Source Site URL:</b>  <a href="%s">%s</a>
-        <b>Error Message:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
+        <b>Error Message:</b> %s
         ''' % (source_site_name, source_repo_name, source_site_url, source_app_name, error_msg)
 
     else:
@@ -729,7 +727,7 @@ def monitor_sites():
         if config_obj["general"]["github_fail_site_count"] >= github_fail_site_max_count:
 
             msg_type = "site_error"
-            error_msg = u"GitHub site down for '%s' subsequent retries" % github_fail_site_max_count
+            error_msg = u"GitHub site '%s' down for '%s' subsequent retries" % (url, github_fail_site_max_count)
             source_site_name = "GitHub"
             notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
             app_logger_instance.warning(error_msg)
@@ -752,7 +750,7 @@ def monitor_sites():
         if config_obj["general"]["aor_fail_site_count"] >= aor_fail_site_max_count:
 
             msg_type = "site_error"
-            error_msg = u"AOR site down for '%s' subsequent retries" % aor_fail_site_max_count
+            error_msg = u"AOR site '%s' down for '%s' subsequent retries" % (url, aor_fail_site_max_count)
             source_site_name = "aor"
             notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
             app_logger_instance.warning(error_msg)
@@ -775,7 +773,7 @@ def monitor_sites():
         if config_obj["general"]["aur_fail_site_count"] >= aur_fail_site_max_count:
 
             msg_type = "site_error"
-            error_msg = u"AUR site down for '%s' subsequent retries" % aur_fail_site_max_count
+            error_msg = u"AUR site '%s' down for '%s' subsequent retries" % (url, aur_fail_site_max_count)
             source_site_name = "aur"
             notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
             app_logger_instance.warning(error_msg)
