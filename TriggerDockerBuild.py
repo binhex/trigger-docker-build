@@ -581,7 +581,16 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     return 0, current_version, source_site_url
 
 
-def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, user_agent_chrome):
+def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome):
+
+    if source_query_type.lower() == "branch":
+
+        json_query = "id"
+
+    else:
+
+        app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
+        return 1, None, None
 
     # use gitlab rest api
     url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
@@ -611,7 +620,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     try:
 
         # construct app version
-        current_version = content['id']
+        current_version = content['%s' % json_query]
 
     except (ValueError, TypeError, KeyError, IndexError):
 
@@ -907,7 +916,7 @@ def monitor_sites():
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            return_code, current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, user_agent_chrome)
+            return_code, current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome)
 
             if return_code != 0:
 
