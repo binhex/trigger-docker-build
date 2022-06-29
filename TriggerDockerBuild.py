@@ -581,6 +581,48 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     return 0, current_version, source_site_url
 
 
+def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, user_agent_chrome):
+
+    # use gitlab rest api
+    url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
+
+    request_type = "get"
+
+    # download webpage content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            # decode json
+            content = json.loads(content)
+
+        except (ValueError, TypeError, KeyError, IndexError):
+
+            app_logger_instance.info(u"Problem loading json from %s" % url)
+            return 1, None, None
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading json content from %s" % url)
+        return 1, None, None
+
+    try:
+
+        # construct app version
+        current_version = content['id']
+
+    except (ValueError, TypeError, KeyError, IndexError):
+
+        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        return 1, None, None
+
+    source_site_url = 'https://gitlab.com/%s/%s' % (source_repo_name, source_app_name)
+
+    return 0, current_version, source_site_url
+
+
 def aor_apps(source_app_name, user_agent_chrome):
 
     # use aor unofficial api to get app release info
@@ -711,6 +753,7 @@ def monitor_sites():
 
     # set package fail counts
     github_fail_site_max_count = 3
+    gitlab_fail_site_max_count = 3
     aor_fail_site_max_count = 3
     aur_fail_site_max_count = 3
 
@@ -735,6 +778,29 @@ def monitor_sites():
     else:
 
         config_obj["general"]["github_fail_site_count"] = 0
+        config_obj.write()
+
+    # check gitlab rest api is operational
+    url = "https://gitlab.com/api/v4/projects"
+
+    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+
+    if return_code != 0:
+
+        config_obj["general"]["gitlab_fail_site_count"] = config_obj["general"]["gitlab_fail_site_count"] + 1
+        config_obj.write()
+
+        if config_obj["general"]["gitlab_fail_site_count"] >= gitlab_fail_site_max_count:
+
+            msg_type = "site_error"
+            error_msg = u"GitLab site '%s' down for '%s' subsequent retries" % (url, gitlab_fail_site_max_count)
+            source_site_name = "GitLab"
+            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
+            app_logger_instance.warning(error_msg)
+
+    else:
+
+        config_obj["general"]["gitlab_fail_site_count"] = 0
         config_obj.write()
 
     # check aor site is operational
@@ -789,6 +855,7 @@ def monitor_sites():
         source_site_name = site_item.get("source_site_name")
         source_app_name = site_item.get("source_app_name")
         source_repo_name = site_item.get("source_repo_name")
+        source_project_id = site_item.get("source_project_id")
         source_branch_name = site_item.get("source_branch_name")
         target_release_days = site_item.get("target_release_days")
         target_repo_name = site_item.get("target_repo_name")
@@ -824,6 +891,23 @@ def monitor_sites():
                 continue
 
             return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, user_agent_chrome, source_branch_name)
+
+            if return_code != 0:
+
+                msg_type = "app_error"
+                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                app_logger_instance.warning(error_msg)
+                continue
+
+        if source_site_name == "gitlab":
+
+            if config_obj["general"]["gitlab_fail_site_count"] != 0:
+
+                app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
+                continue
+
+            return_code, current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, user_agent_chrome)
 
             if return_code != 0:
 
@@ -1153,7 +1237,7 @@ if __name__ == '__main__':
             sys.exit(2)
 
     # setup argparse description and usage, also increase spacing for help to 50
-    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-password <password>] [--target-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
+    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-password <password>] [--target-access-token <token>] [--gitlab-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
 
     # add argparse command line flags
     commandline_parser.add_argument(u"--config", metavar=u"<path>", help=u"specify path for config file e.g. --config /opt/triggerdockerbuild/config/")
@@ -1161,6 +1245,7 @@ if __name__ == '__main__':
     commandline_parser.add_argument(u"--kodi-password", metavar=u"<password>", help=u"specify the password to access kodi e.g. --kodi-password foo")
     commandline_parser.add_argument(u"--email-password", metavar=u"<password>", help=u"specify the email account password e.g. --email-password foo")
     commandline_parser.add_argument(u"--target-access-token", metavar=u"<token>", help=u"specify the github personal access token e.g. --target-access-token 123456789")
+    commandline_parser.add_argument(u"--gitlab_access_token", metavar=u"<token>", help=u"specify the gitlab personal access token e.g. --gitlab_access_token 123456789")
     commandline_parser.add_argument(u"--kodi-notification", action=u"store_true", help=u"enable kodi notification e.g. --kodi-notification")
     commandline_parser.add_argument(u"--email-notification", action=u"store_true", help=u"enable email notification e.g. --email-notification")
     commandline_parser.add_argument(u"--pidfile", metavar=u"<path>", help=u"specify path to pidfile e.g. --pid /var/run/triggerdockerbuild/triggerdockerbuild.pid")
@@ -1287,6 +1372,19 @@ if __name__ == '__main__':
 
         app_logger_instance.warning(u"Target Access Token is not defined via '--target-access-token' or 'config.ini', exiting script...")
         exit(1)
+
+    if args["gitlab_access_token"]:
+
+        gitlab_access_token = args["gitlab_access_token"]
+
+    elif config_obj["general"]["gitlab_access_token"] is not None:
+
+        gitlab_access_token = config_obj["general"]["gitlab_access_token"]
+
+    else:
+
+        app_logger_instance.info(u"GitLab Access Token is not defined via '--gitlab-access-token' or 'config.ini'")
+        gitlab_access_token = None
 
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
