@@ -909,7 +909,7 @@ def monitor_sites():
                 app_logger_instance.warning(error_msg)
                 continue
 
-        if source_site_name == "gitlab":
+        elif source_site_name == "gitlab":
 
             if config_obj["general"]["gitlab_fail_site_count"] != 0:
 
