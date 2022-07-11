@@ -1,4 +1,4 @@
-name: workflow-docker-keepalive
+name: workflow-keepalive
 
 on:
   schedule:
