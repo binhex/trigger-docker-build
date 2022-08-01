@@ -565,12 +565,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
         else:
 
             app_logger_instance.warning(u"Unknown Github query type of '%s', skipping to next iteration..." % github_query_type)
-            return 1, None, None
+            return 1, None, url
 
     except IndexError:
 
         app_logger_instance.warning(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, None
+        return 1, None, url
 
     source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
 
@@ -583,6 +583,11 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
 
 def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome):
 
+    # use gitlab rest api
+    url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
+
+    request_type = "get"
+
     if source_query_type.lower() == "branch":
 
         json_query = "id"
@@ -590,12 +595,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     else:
 
         app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
-        return 1, None, None
-
-    # use gitlab rest api
-    url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
-
-    request_type = "get"
+        return 1, None, url
 
     # download webpage content
     return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
@@ -610,12 +610,12 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, None
+            return 1, None, url
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, None
+        return 1, None, url
 
     try:
 
@@ -625,7 +625,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, None
+        return 1, None, url
 
     source_site_url = 'https://gitlab.com/%s/%s' % (source_repo_name, source_app_name)
 
@@ -654,12 +654,12 @@ def aor_apps(source_app_name, user_agent_chrome):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, None
+            return 1, None, url
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, None
+        return 1, None, url
 
     try:
 
@@ -677,7 +677,7 @@ def aor_apps(source_app_name, user_agent_chrome):
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, None
+        return 1, None, url
 
     source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
 
@@ -702,12 +702,12 @@ def aur_apps(source_app_name, user_agent_chrome):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, None
+            return 1, None, url
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, None
+        return 1, None, url
 
     try:
 
@@ -717,7 +717,7 @@ def aur_apps(source_app_name, user_agent_chrome):
     except IndexError:
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, None
+        return 1, None, url
 
     source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
 
