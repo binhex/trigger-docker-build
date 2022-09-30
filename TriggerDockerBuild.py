@@ -632,6 +632,36 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     return 0, current_version, source_site_url
 
 
+def pypi_apps(source_app_name, user_agent_chrome):
+
+    # use pypi json to get python package version
+    url = "https://pypi.org/pypi/%s/json" % source_app_name
+    request_type = "get"
+
+    # download webpage content
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+
+    if return_code == 0:
+
+        try:
+
+            # decode json
+            content = json.loads(content)
+
+        except (ValueError, TypeError, KeyError, IndexError):
+
+            app_logger_instance.info(u"Problem loading json from %s" % url)
+            return 1, None, url
+
+    else:
+
+        app_logger_instance.info(u"Problem downloading json content from %s" % url)
+        return 1, None, url
+
+    current_version = content['info']['version']
+    return 0, current_version, url
+
+
 def aor_apps(source_app_name, user_agent_chrome):
 
     # use aor unofficial api to get app release info
@@ -763,6 +793,7 @@ def monitor_sites():
     # set package fail counts
     github_fail_site_max_count = 3
     gitlab_fail_site_max_count = 3
+    pypi_fail_site_max_count = 3
     aor_fail_site_max_count = 3
     aur_fail_site_max_count = 3
 
@@ -810,6 +841,29 @@ def monitor_sites():
     else:
 
         config_obj["general"]["gitlab_fail_site_count"] = 0
+        config_obj.write()
+
+    # check pypi website is operational
+    url = "https://pypi.org"
+
+    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+
+    if return_code != 0:
+
+        config_obj["general"]["pypi_fail_site_count"] = config_obj["general"]["pypi_fail_site_count"] + 1
+        config_obj.write()
+
+        if config_obj["general"]["pypi_fail_site_count"] >= pypi_fail_site_max_count:
+
+            msg_type = "site_error"
+            error_msg = u"PyPi site '%s' down for '%s' subsequent retries" % (url, pypi_fail_site_max_count)
+            source_site_name = "PyPi"
+            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
+            app_logger_instance.warning(error_msg)
+
+    else:
+
+        config_obj["general"]["pypi_fail_site_count"] = 0
         config_obj.write()
 
     # check aor site is operational
@@ -917,6 +971,23 @@ def monitor_sites():
                 continue
 
             return_code, current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome)
+
+            if return_code != 0:
+
+                msg_type = "app_error"
+                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
+                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                app_logger_instance.warning(error_msg)
+                continue
+
+        elif source_site_name == "pypi":
+
+            if config_obj["general"]["pypi_fail_site_count"] != 0:
+
+                app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
+                continue
+
+            return_code, current_version, source_site_url = pypi_apps(source_app_name, user_agent_chrome)
 
             if return_code != 0:
 
