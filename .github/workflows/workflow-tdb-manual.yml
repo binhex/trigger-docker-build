@@ -10,7 +10,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Download and unpack GitHub CLI
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -21,7 +21,7 @@ jobs:
             tar -xvf './github-cli.tar.gz'
             sudo cp ./gh*linux_amd64/bin/gh '/usr/local/bin/'
       - name: Authenticate with GitHub for private Gist
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -29,7 +29,7 @@ jobs:
           command: |
             echo "${{ secrets.TDB_PAT }}" | gh auth login --with-token
       - name: Get Gist ID
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -40,7 +40,7 @@ jobs:
             echo "##[set-output name=gist_id;]$(echo ${gist_id})"
         id: get_gist_id
       - name: Change directory to workspace
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -48,7 +48,7 @@ jobs:
           command: |
             cd "${GITHUB_WORKSPACE}"
       - name: Download config from secret Gist
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -58,7 +58,7 @@ jobs:
             gh gist clone "${{ steps.get_gist_id.outputs.gist_id }}" '/tmp/gist'
             cp '/tmp/gist/config.ini' './configs'
       - name: Run Trigger Docker Builds (TDB)
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -72,7 +72,7 @@ jobs:
             --target-access-token "${{ secrets.TDB_PAT }}" \
             --gitlab-access-token "${{ secrets.GITLAB_TOKEN }}"
       - name: Create Gist
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -80,7 +80,7 @@ jobs:
           command: |
             gh gist create './configs/config.ini' --desc 'trigger-docker-build-config'
       - name: Delete previous Gist
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
@@ -88,7 +88,7 @@ jobs:
           command: |
             gh gist delete ${{ steps.get_gist_id.outputs.gist_id }}
       - name: Debug
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
