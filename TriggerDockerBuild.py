@@ -20,6 +20,11 @@ import kodijson
 import datetime
 from bs4 import BeautifulSoup
 
+# hack to workaround bs not being compatible with python 3.10 see
+# https://stackoverflow.com/questions/69515086/error-attributeerror-collections-has-no-attribute-callable-using-beautifu
+import collections
+collections.Callable = collections.abc.Callable
+
 urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
 signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly handle all keyboard interrupts
 
