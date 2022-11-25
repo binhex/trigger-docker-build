@@ -22,8 +22,8 @@ from bs4 import BeautifulSoup
 
 # hack to workaround bs not being compatible with python 3.10 see
 # https://stackoverflow.com/questions/69515086/error-attributeerror-collections-has-no-attribute-callable-using-beautifu
-import collections
-collections.Callable = collections.abc.Callable
+# import collections
+# collections.Callable = collections.abc.Callable
 
 urllib3.disable_warnings()  # required to suppress ssl warning for urllib3 (requests uses urllib3)
 signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly handle all keyboard interrupts
@@ -31,6 +31,7 @@ signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly 
 # TODO change input to functions as dictionary
 # TODO change functions to **kwargs and use .get() to get value (will be none if not fund)
 # TODO change return for function to dictionary
+
 
 def create_config():
 
