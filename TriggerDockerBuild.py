@@ -1127,7 +1127,7 @@ def monitor_sites():
                     # get app version from soup
                     current_version = re.search(r"[\d]+[\d.]+(?=.jar)", url_line_string).group()
 
-                except (IndexError, KeyError):
+                except (IndexError, KeyError, AttributeError):
 
                     msg_type = "app_error"
                     error_msg = u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
