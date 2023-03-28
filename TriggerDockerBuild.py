@@ -936,7 +936,6 @@ def monitor_sites():
 
         # set default values in case they are not supplied
         source_site_url = None
-        error_msg = None
 
         app_logger_instance.info(u"-------------------------------------")
         app_logger_instance.info(u"Processing started for application %s..." % source_app_name)
@@ -1125,7 +1124,7 @@ def monitor_sites():
                     url_line_string = str(url_line)
 
                     # get app version from soup
-                    current_version = re.search(r"[\d]+[\d.]+(?=.jar)", url_line_string).group()
+                    current_version = re.search(r"\d+[\d.]+(?=.jar)", url_line_string).group()
 
                 except (IndexError, KeyError, AttributeError):
 
