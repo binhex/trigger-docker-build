@@ -1095,41 +1095,30 @@ def monitor_sites():
 
             elif source_app_name == "minecraftserver":
 
-                source_site_url = "https://www.minecraft.net/en-us/download/server"
-                return_code, soup = soup_regex(source_site_url, user_agent_chrome)
+                request_type = "get"
+                source_site_url = "https://launchermeta.mojang.com/mc/game/version_manifest.json"
+
+                # get version manifest content
+                return_code, status_code, content = http_client(url=source_site_url, user_agent=user_agent_chrome, request_type=request_type)
 
                 if return_code != 0:
 
                     msg_type = "app_error"
-                    error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
+                    error_msg = u"Problem downloading version manifest for url '%s', skipping to next iteration..." % source_site_url
                     notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
+                version_manifest_content = json.loads(content)
+
                 try:
 
-                    # get download url from soup
-                    url_line = soup.select('a[aria-label="mincraft version"]')[0]
+                    current_version = version_manifest_content['latest']['release']
 
                 except (IndexError, KeyError):
 
                     msg_type = "app_error"
-                    error_msg = u"Unable to identify download url using beautiful soup for app %s, ignoring..." % source_app_name
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
-                    app_logger_instance.warning(error_msg)
-                    continue
-
-                try:
-
-                    url_line_string = str(url_line)
-
-                    # get app version from soup
-                    current_version = re.search(r"\d+[\d.]+(?=.jar)", url_line_string).group()
-
-                except (IndexError, KeyError, AttributeError):
-
-                    msg_type = "app_error"
-                    error_msg = u"Unable to identify version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
+                    error_msg = u"Unable to identify current release version for app '%s', ignoring..." % source_app_name
                     notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
