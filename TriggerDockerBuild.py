@@ -422,7 +422,7 @@ def http_client(**kwargs):
             return 0, status_code, content
 
 
-def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent_chrome):
+def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent):
 
     # remove illegal characters from version (github does not allow certain chars for release name)
     current_version = re.sub(r":", r".", current_version, flags=re.IGNORECASE)
@@ -437,7 +437,7 @@ def github_create_release(current_version, target_repo_branch, target_repo_owner
     data_payload = '{"tag_name": "%s", "target_commitish": "%s", "name": "%s", "body": "%s", "draft": false, "prerelease": false}' % (github_tag_name, target_repo_branch, github_release_name, github_release_body)
 
     # process post request
-    return_code, status_code, content = http_client(url=http_url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type, data_payload=data_payload)
+    return_code, status_code, content = http_client(url=http_url, user_agent=user_agent, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type, data_payload=data_payload)
     return return_code, status_code, content
 
 
@@ -445,19 +445,19 @@ def check_site(**kwargs):
 
     # unpack arguments from dictionary
     url = kwargs.get("url")
-    user_agent_chrome = kwargs.get("user_agent_chrome")
+    user_agent = kwargs.get("user_agent")
 
     # construct url to github rest api
     request_type = "get"
 
     # download json content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
 
     # convert the following then compare against throttle days value "2020-04-15T21:53:20Z"
     return return_code, status_code
 
 
-def github_target_last_release_date(target_repo_owner, target_repo_name, user_agent_chrome):
+def github_target_last_release_date(target_repo_owner, target_repo_name, user_agent):
 
     github_query_type = "releases/latest"
     json_query = "published_at"
@@ -467,7 +467,7 @@ def github_target_last_release_date(target_repo_owner, target_repo_name, user_ag
     request_type = "get"
 
     # download json content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
 
     if return_code == 0:
 
@@ -499,7 +499,7 @@ def github_target_last_release_date(target_repo_owner, target_repo_name, user_ag
     return 0, target_last_release_date
 
 
-def github_apps(source_app_name, source_query_type, source_repo_name, user_agent_chrome, source_branch_name):
+def github_apps(source_app_name, source_query_type, source_repo_name, user_agent, source_branch_name):
 
     # certain github repos do not have releases, only tags, thus we need to account for these differently
     if source_query_type.lower() == "tag":
@@ -538,7 +538,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     request_type = "get"
 
     # download json content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
 
     if return_code == 0:
 
@@ -587,7 +587,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     return 0, current_version, source_site_url
 
 
-def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome):
+def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent):
 
     # use gitlab rest api
     url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
@@ -604,7 +604,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
         return 1, None, url
 
     # download webpage content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
 
     if return_code == 0:
 
@@ -638,14 +638,14 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     return 0, current_version, source_site_url
 
 
-def pypi_apps(source_app_name, user_agent_chrome):
+def pypi_apps(source_app_name, user_agent):
 
     # use pypi json to get python package version
     url = "https://pypi.org/pypi/%s/json" % source_app_name
     request_type = "get"
 
     # download webpage content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
 
     if return_code == 0:
 
@@ -668,14 +668,14 @@ def pypi_apps(source_app_name, user_agent_chrome):
     return 0, current_version, url
 
 
-def aor_apps(source_app_name, user_agent_chrome):
+def aor_apps(source_app_name, user_agent):
 
     # use aor unofficial api to get app release info
     url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
     request_type = "get"
 
     # download webpage content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
 
     if return_code == 0:
 
@@ -720,14 +720,14 @@ def aor_apps(source_app_name, user_agent_chrome):
     return 0, current_version, source_site_url
 
 
-def aur_apps(source_app_name, user_agent_chrome):
+def aur_apps(source_app_name, user_agent):
 
     # use aur api to get app release info
     url = "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=%s" % source_app_name
     request_type = "get"
 
     # download webpage content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
 
     if return_code == 0:
 
@@ -760,13 +760,13 @@ def aur_apps(source_app_name, user_agent_chrome):
     return 0, current_version, source_site_url
 
 
-def soup_regex(source_site_url, user_agent_chrome):
+def soup_regex(source_site_url, user_agent):
 
     # download webpage
     request_type = "get"
 
     # download webpage content
-    return_code, status_code, content = http_client(url=source_site_url, user_agent=user_agent_chrome, request_type=request_type)
+    return_code, status_code, content = http_client(url=source_site_url, user_agent=user_agent, request_type=request_type)
 
     if return_code == 0:
 
@@ -794,7 +794,8 @@ def monitor_sites():
     target_repo_owner = config_obj["general"]["target_repo_owner"]
 
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
-    user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4619.2 Safari/537.36'
+    user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
+    user_agent_curl = 'curl/7.86.0'
 
     # set package fail counts
     github_fail_site_max_count = 3
@@ -806,7 +807,7 @@ def monitor_sites():
     # check github api is operational
     url = "https://api.github.com"
 
-    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
 
     if return_code != 0:
 
@@ -829,7 +830,7 @@ def monitor_sites():
     # check gitlab rest api is operational
     url = "https://gitlab.com/api/v4/projects"
 
-    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
 
     if return_code != 0:
 
@@ -852,7 +853,7 @@ def monitor_sites():
     # check pypi website is operational
     url = "https://pypi.org"
 
-    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
 
     if return_code != 0:
 
@@ -875,7 +876,7 @@ def monitor_sites():
     # check aor site is operational
     url = "https://www.archlinux.org"
 
-    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+    return_code, status_code = check_site(url=url, user_agent=user_agent_curl)
 
     if return_code != 0:
 
@@ -898,7 +899,7 @@ def monitor_sites():
     # check aur site is operational
     url = "https://aur.archlinux.org"
 
-    return_code, status_code = check_site(url=url, user_agent_chrome=user_agent_chrome)
+    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
 
     if return_code != 0:
 
@@ -1014,7 +1015,7 @@ def monitor_sites():
 
                 grace_period_mins = 60
 
-            return_code, current_version, source_site_url = aor_apps(source_app_name, user_agent_chrome)
+            return_code, current_version, source_site_url = aor_apps(source_app_name, user_agent_curl)
 
             if return_code != 0:
 
@@ -1052,7 +1053,7 @@ def monitor_sites():
 
                     msg_type = "app_error"
                     error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name,source_site_url=source_site_url)
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
@@ -1220,15 +1221,14 @@ def monitor_sites():
                 else:
 
                     # TODO this is a hack to work around the fact we have converted dict to keyword args
-                    regex_code = '(?<="code":\s")[^"]+'
+                    regex_code = r'(?<="code":\s")[^"]+'
                     code = (re.search(regex_code, str(content))).group(0)
 
                     if code.lower() == "already_exists":
 
                         app_logger_instance.warning(u"Problem creating GitHub release as it already exists for '%s/%s', overwriting current version and skipping to next iteration..." % (target_repo_owner, target_repo_name))
                         app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
-                        config_obj["results"]["%s_%s_%s_previous_version" % (
-                        source_site_name, source_app_name, target_repo_name)] = current_version
+                        config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
                         config_obj.write()
 
                     else:
