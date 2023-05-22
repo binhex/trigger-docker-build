@@ -671,7 +671,7 @@ def pypi_apps(source_app_name, user_agent):
 def aor_apps(source_app_name, user_agent):
 
     # use aor unofficial api to get app release info
-    url = "https://www.archlinux.org/packages/search/json/?q=%s&repo=Community&repo=Core&repo=Extra&repo=Multilib&arch=any&arch=x86_64" % source_app_name
+    url = 'https://archlinux.org/packages/search/json/?q=%s' % source_app_name
     request_type = "get"
 
     # download webpage content
@@ -1015,7 +1015,7 @@ def monitor_sites():
 
                 grace_period_mins = 60
 
-            return_code, current_version, source_site_url = aor_apps(source_app_name, user_agent_curl)
+            return_code, current_version, source_site_url = aor_apps(source_app_name, user_agent_chrome)
 
             if return_code != 0:
 
