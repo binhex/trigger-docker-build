@@ -12,59 +12,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Download and unpack GitHub CLI
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            cd /tmp
-            curl -o './github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
-            tar -xvf './github-cli.tar.gz'
-            sudo cp ./gh*linux_amd64/bin/gh '/usr/local/bin/'
+        shell: bash
+        run: |
+          cd /tmp
+          curl -o './github-cli.tar.gz' -L 'https://github.com/cli/cli/releases/download/v1.10.0/gh_1.10.0_linux_amd64.tar.gz'
+          tar -xvf './github-cli.tar.gz'
+          sudo cp ./gh*linux_amd64/bin/gh '/usr/local/bin/'
       - name: Authenticate with GitHub for private Gist
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            echo "${{ secrets.TDB_PAT }}" | gh auth login --with-token
+        shell: bash
+        run: |
+          echo "${{ secrets.TDB_PAT }}" | gh auth login --with-token
       - name: Get Gist ID
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            config_file_desc='trigger-docker-build-config'
-            gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file_desc}" | awk -F ' ' '{ print $1 }')
-            echo "gist_id=$gist_id" >> $GITHUB_OUTPUT
+        shell: bash
+        run: |
+          config_file_desc='trigger-docker-build-config'
+          gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file_desc}" | awk -F ' ' '{ print $1 }')
+          echo "gist_id=$gist_id" >> $GITHUB_OUTPUT
         id: get_gist_id
       - name: Change directory to workspace
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            cd "${GITHUB_WORKSPACE}"
+        shell: bash
+        run: |
+          cd "${GITHUB_WORKSPACE}"
       - name: Download config from secret Gist
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            echo "[debug] Gist ID is '${{ steps.get_gist_id.outputs.gist_id }}'"
-            gh gist clone "${{ steps.get_gist_id.outputs.gist_id }}" '/tmp/gist'
-            cp '/tmp/gist/config.ini' './configs'
+        shell: bash
+        run: |
+          echo "[debug] Gist ID is '${{ steps.get_gist_id.outputs.gist_id }}'"
+          gh gist clone "${{ steps.get_gist_id.outputs.gist_id }}" '/tmp/gist'
+          cp '/tmp/gist/config.ini' './configs'
       - name: Run Trigger Docker Builds (TDB)
-        uses: nick-fields/retry@v3
+        uses: Wandalen/wretry.action@v3
         with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
+          attempt_limit: 3
+          attempt_delay: 600000
           command: |
             python3 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py \
             --config ./configs \
@@ -74,27 +53,15 @@ jobs:
             --target-access-token "${{ secrets.TDB_PAT }}" \
             --gitlab-access-token "${{ secrets.GITLAB_TOKEN }}"
       - name: Create Gist
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            gh gist create './configs/config.ini' --desc 'trigger-docker-build-config'
+        shell: bash
+        run: |
+          gh gist create './configs/config.ini' --desc 'trigger-docker-build-config'
       - name: Delete previous Gist
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            gh gist delete ${{ steps.get_gist_id.outputs.gist_id }}
+        shell: bash
+        run: |
+          gh gist delete ${{ steps.get_gist_id.outputs.gist_id }}
       - name: Debug
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 60
-          max_attempts: 3
-          retry_wait_seconds: 120
-          command: |
-            echo "[debug] file contents of config file 'config.ini' is..." && cat './configs/config.ini'
-            echo "[debug] file contents of log file 'app.log' is..." && cat './logs/app.log'
+        shell: bash
+        run: |
+          echo "[debug] file contents of config file 'config.ini' is..." && cat './configs/config.ini'
+          echo "[debug] file contents of log file 'app.log' is..." && cat './logs/app.log'
