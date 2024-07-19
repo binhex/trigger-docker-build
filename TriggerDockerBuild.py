@@ -446,15 +446,43 @@ def check_site(**kwargs):
     # unpack arguments from dictionary
     url = kwargs.get("url")
     user_agent = kwargs.get("user_agent")
+    site_name = kwargs.get("site_name")
 
     # construct url to github rest api
     request_type = "get"
 
-    # download json content
-    return_code, status_code, content = http_client(url=url, user_agent=user_agent, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+    # set number of retries and set default site_down boolean
+    retries = 10
+    sleep_secs = 60
+    site_down = True
+
+    while True:
+
+        # download json content
+        return_code, status_code, content = http_client(url=url, user_agent=user_agent, additional_header={'Authorization': 'token %s' % target_access_token}, request_type=request_type)
+
+        if return_code == 0:
+            site_down = False
+            app_logger_instance.debug(f"'{site_name}' site operational for '{url}'")
+            break
+        else:
+            app_logger_instance.info(f"Having issues connecting to '{site_name}' for '{url}', retrying in '{sleep_secs}' seconds...")
+            time.sleep(sleep_secs)
+            retries = retries - 1
+
+        if retries <= 0:
+            app_logger_instance.warning(f"'{site_name}' site down for '{url}'")
+            break
+
+    if site_down:
+
+        msg_type = "site_error"
+        error_msg = f"{site_name} site down - '{url}'"
+        notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=site_name, source_site_url=url)
+        app_logger_instance.warning(error_msg)
 
     # convert the following then compare against throttle days value "2020-04-15T21:53:20Z"
-    return return_code, status_code
+    return site_down
 
 
 def github_target_last_release_date(target_repo_owner, target_repo_name, user_agent):
@@ -795,129 +823,32 @@ def monitor_sites():
 
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
     user_agent_chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
-    user_agent_curl = 'curl/7.86.0'
-
-    # set package fail counts
-    github_fail_site_max_count = 3
-    gitlab_fail_site_max_count = 3
-    pypi_fail_site_max_count = 3
-    aor_fail_site_max_count = 3
-    aur_fail_site_max_count = 3
 
     # check github api is operational
     url = "https://api.github.com"
 
-    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
-
-    if return_code != 0:
-
-        config_obj["general"]["github_fail_site_count"] = config_obj["general"]["github_fail_site_count"] + 1
-        config_obj.write()
-
-        if config_obj["general"]["github_fail_site_count"] >= github_fail_site_max_count:
-
-            msg_type = "site_error"
-            error_msg = u"GitHub site '%s' down for '%s' subsequent retries" % (url, github_fail_site_max_count)
-            source_site_name = "GitHub"
-            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
-            app_logger_instance.warning(error_msg)
-
-    else:
-
-        config_obj["general"]["github_fail_site_count"] = 0
-        config_obj.write()
+    site_down_github = check_site(url=url, user_agent=user_agent_chrome, site_name='GitHub')
 
     # check gitlab rest api is operational
     url = "https://gitlab.com/api/v4/projects"
 
-    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
-
-    if return_code != 0:
-
-        config_obj["general"]["gitlab_fail_site_count"] = config_obj["general"]["gitlab_fail_site_count"] + 1
-        config_obj.write()
-
-        if config_obj["general"]["gitlab_fail_site_count"] >= gitlab_fail_site_max_count:
-
-            msg_type = "site_error"
-            error_msg = u"GitLab site '%s' down for '%s' subsequent retries" % (url, gitlab_fail_site_max_count)
-            source_site_name = "GitLab"
-            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
-            app_logger_instance.warning(error_msg)
-
-    else:
-
-        config_obj["general"]["gitlab_fail_site_count"] = 0
-        config_obj.write()
+    site_down_gitlab = check_site(url=url, user_agent=user_agent_chrome, site_name='GitLab')
 
     # check pypi website is operational
     url = "https://pypi.org"
 
-    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
-
-    if return_code != 0:
-
-        config_obj["general"]["pypi_fail_site_count"] = config_obj["general"]["pypi_fail_site_count"] + 1
-        config_obj.write()
-
-        if config_obj["general"]["pypi_fail_site_count"] >= pypi_fail_site_max_count:
-
-            msg_type = "site_error"
-            error_msg = u"PyPi site '%s' down for '%s' subsequent retries" % (url, pypi_fail_site_max_count)
-            source_site_name = "PyPi"
-            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
-            app_logger_instance.warning(error_msg)
-
-    else:
-
-        config_obj["general"]["pypi_fail_site_count"] = 0
-        config_obj.write()
+    site_down_pypi = check_site(url=url, user_agent=user_agent_chrome, site_name='PyPi')
 
     # check aor site is operational
     url = "https://www.archlinux.org"
 
-    return_code, status_code = check_site(url=url, user_agent=user_agent_curl)
-
-    if return_code != 0:
-
-        config_obj["general"]["aor_fail_site_count"] = config_obj["general"]["aor_fail_site_count"] + 1
-        config_obj.write()
-
-        if config_obj["general"]["aor_fail_site_count"] >= aor_fail_site_max_count:
-
-            msg_type = "site_error"
-            error_msg = u"AOR site '%s' down for '%s' subsequent retries" % (url, aor_fail_site_max_count)
-            source_site_name = "aor"
-            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
-            app_logger_instance.warning(error_msg)
-
-    else:
-
-        config_obj["general"]["aor_fail_site_count"] = 0
-        config_obj.write()
+    site_down_aor = check_site(url=url, user_agent=user_agent_chrome, site_name='AOR')
 
     # check aur site is operational
-    url = "https://aur.archlinux.org"
+    test_package = 'yay'
+    url = f"https://aur.archlinux.org/rpc/?v=5&type=info&arg[]={test_package}"
 
-    return_code, status_code = check_site(url=url, user_agent=user_agent_chrome)
-
-    if return_code != 0:
-
-        config_obj["general"]["aur_fail_site_count"] = config_obj["general"]["aur_fail_site_count"] + 1
-        config_obj.write()
-
-        if config_obj["general"]["aur_fail_site_count"] >= aur_fail_site_max_count:
-
-            msg_type = "site_error"
-            error_msg = u"AUR site '%s' down for '%s' subsequent retries" % (url, aur_fail_site_max_count)
-            source_site_name = "aur"
-            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_site_url=url)
-            app_logger_instance.warning(error_msg)
-
-    else:
-
-        config_obj["general"]["aur_fail_site_count"] = 0
-        config_obj.write()
+    site_down_aur = check_site(url=url, user_agent=user_agent_chrome, site_name='AUR')
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
@@ -954,7 +885,7 @@ def monitor_sites():
 
         if source_site_name == "github":
 
-            if config_obj["general"]["github_fail_site_count"] != 0:
+            if site_down_github:
 
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
@@ -971,7 +902,7 @@ def monitor_sites():
 
         elif source_site_name == "gitlab":
 
-            if config_obj["general"]["gitlab_fail_site_count"] != 0:
+            if site_down_gitlab:
 
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
@@ -988,7 +919,7 @@ def monitor_sites():
 
         elif source_site_name == "pypi":
 
-            if config_obj["general"]["pypi_fail_site_count"] != 0:
+            if site_down_pypi:
 
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
@@ -1005,7 +936,7 @@ def monitor_sites():
 
         elif source_site_name == "aor":
 
-            if config_obj["general"]["aor_fail_site_count"] != 0:
+            if site_down_aor:
 
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
@@ -1027,7 +958,7 @@ def monitor_sites():
 
         elif source_site_name == "aur":
 
-            if config_obj["general"]["aur_fail_site_count"] != 0:
+            if site_down_aur:
 
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
