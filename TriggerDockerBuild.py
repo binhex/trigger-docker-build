@@ -553,7 +553,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     else:
 
         app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
-        return None
+        return None, None
 
     # construct url to github rest api
     url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
@@ -577,12 +577,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None
+            return None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return None
+        return None, None
 
     try:
 
@@ -599,12 +599,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
         else:
 
             app_logger_instance.warning(u"Unknown Github query type of '%s', skipping to next iteration..." % github_query_type)
-            return None
+            return None, None
 
     except IndexError:
 
         app_logger_instance.warning(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return None
+        return None, None
 
     source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
 
@@ -629,7 +629,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_site_name, source_proj
     else:
 
         app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
-        return None
+        return None, None
 
     # download webpage content
     return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
@@ -644,12 +644,12 @@ def gitlab_apps(source_app_name, source_repo_name, source_site_name, source_proj
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None
+            return None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return None
+        return None, None
 
     try:
 
@@ -659,7 +659,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_site_name, source_proj
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return None
+        return None, None
 
     source_site_url = 'https://gitlab.com/%s/%s' % (source_repo_name, source_app_name)
 
@@ -685,12 +685,12 @@ def pypi_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None
+            return None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return None
+        return None, None
 
     current_version = content['info']['version']
     source_site_url = f"https://pypi.org/search/?q={source_app_name}"
@@ -720,12 +720,12 @@ def aor_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None
+            return None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return None
+        return None, None
 
     try:
 
@@ -743,7 +743,7 @@ def aor_apps(source_app_name, user_agent):
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return None
+        return None, None
 
     source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
 
@@ -768,12 +768,12 @@ def aur_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None
+            return None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return None
+        return None, None
 
     try:
 
@@ -783,7 +783,7 @@ def aur_apps(source_app_name, user_agent):
     except IndexError:
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return None
+        return None, None
 
     source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
 
@@ -807,12 +807,12 @@ def soup_regex(source_site_url, user_agent):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem extracting url using regex from url  %s" % source_site_url)
-            return None
+            return None, None
 
     else:
 
         app_logger_instance.info(u"Problem downloading webpage from url  %s" % source_site_url)
-        return None
+        return None, None
 
     return soup
 
