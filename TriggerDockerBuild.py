@@ -553,7 +553,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     else:
 
         app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
-        return 1, None, None
+        return None
 
     # construct url to github rest api
     url = "https://api.github.com/repos/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
@@ -577,12 +577,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, None
+            return None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, None
+        return None
 
     try:
 
@@ -599,12 +599,12 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
         else:
 
             app_logger_instance.warning(u"Unknown Github query type of '%s', skipping to next iteration..." % github_query_type)
-            return 1, None, url
+            return None
 
     except IndexError:
 
         app_logger_instance.warning(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, url
+        return None
 
     source_site_url = "https://github.com/%s/%s/%s" % (source_repo_name, source_app_name, github_query_type)
 
@@ -612,10 +612,10 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
 
         source_site_url = "%s/%s" % (source_site_url, source_branch_name)
 
-    return 0, current_version, source_site_url
+    return current_version, source_site_url
 
 
-def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent):
+def gitlab_apps(source_app_name, source_repo_name, source_site_name, source_project_id, source_branch_name, source_query_type, user_agent):
 
     # use gitlab rest api
     url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
@@ -629,7 +629,7 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     else:
 
         app_logger_instance.warning(u"source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower())
-        return 1, None, url
+        return None
 
     # download webpage content
     return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
@@ -644,12 +644,12 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, url
+            return None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, url
+        return None
 
     try:
 
@@ -659,11 +659,11 @@ def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_bra
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, url
+        return None
 
     source_site_url = 'https://gitlab.com/%s/%s' % (source_repo_name, source_app_name)
 
-    return 0, current_version, source_site_url
+    return current_version, source_site_url
 
 
 def pypi_apps(source_app_name, user_agent):
@@ -685,15 +685,17 @@ def pypi_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, url
+            return None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, url
+        return None
 
     current_version = content['info']['version']
-    return 0, current_version, url
+    source_site_url = f"https://pypi.org/search/?q={source_app_name}"
+
+    return current_version, source_site_url
 
 
 def aor_apps(source_app_name, user_agent):
@@ -718,12 +720,12 @@ def aor_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, url
+            return None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, url
+        return None
 
     try:
 
@@ -741,11 +743,11 @@ def aor_apps(source_app_name, user_agent):
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, url
+        return None
 
     source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
 
-    return 0, current_version, source_site_url
+    return current_version, source_site_url
 
 
 def aur_apps(source_app_name, user_agent):
@@ -766,12 +768,12 @@ def aur_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return 1, None, url
+            return None
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return 1, None, url
+        return None
 
     try:
 
@@ -781,11 +783,11 @@ def aur_apps(source_app_name, user_agent):
     except IndexError:
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return 1, None, url
+        return None
 
     source_site_url = "https://aur.archlinux.org/packages/%s/" % source_app_name
 
-    return 0, current_version, source_site_url
+    return current_version, source_site_url
 
 
 def soup_regex(source_site_url, user_agent):
@@ -805,14 +807,14 @@ def soup_regex(source_site_url, user_agent):
         except (ValueError, TypeError, KeyError):
 
             app_logger_instance.info(u"Problem extracting url using regex from url  %s" % source_site_url)
-            return 1, None
+            return None
 
     else:
 
         app_logger_instance.info(u"Problem downloading webpage from url  %s" % source_site_url)
-        return 1, None
+        return None
 
-    return 0, soup
+    return soup
 
 
 def monitor_sites():
@@ -849,6 +851,17 @@ def monitor_sites():
     url = f"https://aur.archlinux.org/rpc/?v=5&type=info&arg[]={test_package}"
 
     site_down_aur = check_site(url=url, user_agent=user_agent_chrome, site_name='AUR')
+
+    # set counter for number of failures to get app package details
+    app_down_gitlab_counter = 0
+    app_down_github_counter = 0
+    app_down_pypi_counter = 0
+    app_down_aor_counter = 0
+    app_down_aur_counter = 0
+    app_down_soup_counter = 0
+
+    # set maximum number of failed app package detail downloads
+    app_down_counter_max = 3
 
     # loop over each site and check previous and current result
     for site_item in config_site_list:
@@ -890,13 +903,27 @@ def monitor_sites():
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            return_code, current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, user_agent_chrome, source_branch_name)
+            current_version, source_site_url = github_apps(source_app_name, source_query_type, source_repo_name, user_agent_chrome, source_branch_name)
 
-            if return_code != 0:
+            if current_version is None:
 
-                msg_type = "app_error"
-                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
+
+                # increment counter for number of failed app detail downloads
+                app_down_github_counter += 1
+
+                # if number of failed app package detail downloads above limit then silence email notifications
+                if app_down_github_counter <= app_down_counter_max:
+
+                    msg_type = "app_error"
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
+                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
+                                       source_site_url=source_site_url)
+
+                else:
+
+                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -907,13 +934,27 @@ def monitor_sites():
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            return_code, current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome)
+            current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_site_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome)
 
-            if return_code != 0:
+            if current_version is None:
 
-                msg_type = "app_error"
-                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
+
+                # increment counter for number of failed app detail downloads
+                app_down_gitlab_counter += 1
+
+                # if number of failed app package detail downloads above limit then silence email notifications
+                if app_down_gitlab_counter <= app_down_counter_max:
+
+                    msg_type = "app_error"
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
+                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
+                                       source_site_url=source_site_url)
+
+                else:
+
+                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -924,13 +965,27 @@ def monitor_sites():
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            return_code, current_version, source_site_url = pypi_apps(source_app_name, user_agent_chrome)
+            current_version, source_site_url = pypi_apps(source_app_name, user_agent_chrome)
 
-            if return_code != 0:
+            if current_version is None:
 
-                msg_type = "app_error"
-                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
+
+                # increment counter for number of failed app detail downloads
+                app_down_pypi_counter += 1
+
+                # if number of failed app package detail downloads above limit then silence email notifications
+                if app_down_pypi_counter <= app_down_counter_max:
+
+                    msg_type = "app_error"
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
+                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
+                                       source_site_url=source_site_url)
+
+                else:
+
+                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -946,13 +1001,27 @@ def monitor_sites():
 
                 grace_period_mins = 60
 
-            return_code, current_version, source_site_url = aor_apps(source_app_name, user_agent_chrome)
+            current_version, source_site_url = aor_apps(source_app_name, user_agent_chrome)
 
-            if return_code != 0:
+            if current_version is None:
 
-                msg_type = "app_error"
-                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
+
+                # increment counter for number of failed app detail downloads
+                app_down_aor_counter += 1
+
+                # if number of failed app package detail downloads above limit then silence email notifications
+                if app_down_aor_counter <= app_down_counter_max:
+
+                    msg_type = "app_error"
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
+                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
+                                       source_site_url=source_site_url)
+
+                else:
+
+                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -963,13 +1032,27 @@ def monitor_sites():
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            return_code, current_version, source_site_url = aur_apps(source_app_name, user_agent_chrome)
+            current_version, source_site_url = aur_apps(source_app_name, user_agent_chrome)
 
-            if return_code != 0:
+            if current_version is None:
 
-                msg_type = "app_error"
-                error_msg = u"Unable to connect to site '%s' for application '%s', skipping to next iteration..." % (source_site_name, source_app_name)
-                notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
+
+                # increment counter for number of failed app detail downloads
+                app_down_aur_counter += 1
+
+                # if number of failed app package detail downloads above limit then silence email notifications
+                if app_down_aur_counter <= app_down_counter_max:
+
+                    msg_type = "app_error"
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
+                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
+                                       source_site_url=source_site_url)
+
+                else:
+
+                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+
                 app_logger_instance.warning(error_msg)
                 continue
 
@@ -978,13 +1061,27 @@ def monitor_sites():
             if source_app_name == "minecraftbedrock":
 
                 source_site_url = "https://www.minecraft.net/en-us/download/server/bedrock"
-                return_code, soup = soup_regex(source_site_url, user_agent_chrome)
+                soup = soup_regex(source_site_url, user_agent_chrome)
 
-                if return_code != 0:
+                if soup is None:
 
-                    msg_type = "app_error"
-                    error_msg = u"Problem parsing webpage using beautiful soup for url  %s, skipping to next iteration..." % source_site_url
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
+                    error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
+
+                    # increment counter for number of failed app detail downloads
+                    app_down_soup_counter += 1
+
+                    # if number of failed app package detail downloads above limit then silence email notifications
+                    if app_down_soup_counter <= app_down_counter_max:
+
+                        msg_type = "app_error"
+                        notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
+                                           source_repo_name=source_repo_name, source_app_name=source_app_name,
+                                           source_site_url=source_site_url)
+
+                    else:
+
+                        app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+
                     app_logger_instance.warning(error_msg)
                     continue
 
