@@ -866,7 +866,7 @@ def monitor_sites():
     app_down_aur_counter = 0
     app_down_soup_counter = 0
 
-    # set maximum number of failed app package detail downloads
+    # set maximum number of email notifications for failed downloads before skipping
     app_down_counter_max = 3
 
     # loop over each site and check previous and current result
