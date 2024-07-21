@@ -928,7 +928,7 @@ def monitor_sites():
 
                 else:
 
-                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+                    app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
 
                 app_logger_instance.warning(error_msg)
                 continue
@@ -959,7 +959,7 @@ def monitor_sites():
 
                 else:
 
-                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+                    app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
 
                 app_logger_instance.warning(error_msg)
                 continue
@@ -990,7 +990,7 @@ def monitor_sites():
 
                 else:
 
-                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+                    app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
 
                 app_logger_instance.warning(error_msg)
                 continue
@@ -1026,7 +1026,7 @@ def monitor_sites():
 
                 else:
 
-                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+                    app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
 
                 app_logger_instance.warning(error_msg)
                 continue
@@ -1057,7 +1057,7 @@ def monitor_sites():
 
                 else:
 
-                    app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+                    app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
 
                 app_logger_instance.warning(error_msg)
                 continue
@@ -1086,7 +1086,7 @@ def monitor_sites():
 
                     else:
 
-                        app_logger_instance.info(f"Number of failed downloads for application package has exceeded '{app_down_counter_max}', skipping notifications")
+                        app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
 
                     app_logger_instance.warning(error_msg)
                     continue
