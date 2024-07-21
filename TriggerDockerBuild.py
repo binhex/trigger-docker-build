@@ -832,12 +832,14 @@ def monitor_sites():
     site_down_gitlab = check_site(url=url, user_agent=user_agent_chrome, site_name='GitLab')
 
     # check pypi website is operational
-    url = "https://pypi.org"
+    test_package = 'requests'
+    url = f"https://pypi.org/pypi/{test_package}/json"
 
     site_down_pypi = check_site(url=url, user_agent=user_agent_chrome, site_name='PyPi')
 
     # check aor site is operational
-    url = "https://www.archlinux.org"
+    test_package = 'base'
+    url = f'https://archlinux.org/packages/core/any/{test_package}/'
 
     site_down_aor = check_site(url=url, user_agent=user_agent_chrome, site_name='AOR')
 
