@@ -708,41 +708,23 @@ def aor_apps(source_app_name, user_agent):
     url = 'https://archlinux.org/packages/search/json/?q=%s' % source_app_name
     request_type = "get"
 
+    # construct url for package details
+    source_site_url = f"https://archlinux.org/packages/?sort=&q={source_app_name}&maintainer=&flagged="
+
     # download webpage content
     return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
 
     try:
 
-        # get repo name and arch type (used in url construct for email notification)
-        source_repo_name = content[0]['repo']
-        source_arch_name = content[0]['arch']
+        # decode json
+        content = json.loads(content)
+
+        # filter python objects with list comprehension to prevent fuzzy mismatch
+        content = [x for x in content['results'] if x['pkgname'] == source_app_name]
 
     except (ValueError, TypeError, KeyError, IndexError):
 
-        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return None, None
-
-    # construct url for package details
-    source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
-
-    if return_code == 0:
-
-        try:
-
-            # decode json
-            content = json.loads(content)
-
-            # filter python objects with list comprehension to prevent fuzzy mismatch
-            content = [x for x in content['results'] if x['pkgname'] == source_app_name]
-
-        except (ValueError, TypeError, KeyError, IndexError):
-
-            app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None, source_site_url
-
-    else:
-
-        app_logger_instance.info(u"Problem downloading json content from %s" % url)
+        app_logger_instance.info(u"Problem loading json from %s" % url)
         return None, source_site_url
 
     try:
