@@ -711,6 +711,20 @@ def aor_apps(source_app_name, user_agent):
     # download webpage content
     return_code, status_code, content = http_client(url=url, user_agent=user_agent, request_type=request_type)
 
+    try:
+
+        # get repo name and arch type (used in url construct for email notification)
+        source_repo_name = content[0]['repo']
+        source_arch_name = content[0]['arch']
+
+    except (ValueError, TypeError, KeyError, IndexError):
+
+        app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
+        return None, None
+
+    # construct url for package details
+    source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
+
     if return_code == 0:
 
         try:
@@ -724,12 +738,12 @@ def aor_apps(source_app_name, user_agent):
         except (ValueError, TypeError, KeyError, IndexError):
 
             app_logger_instance.info(u"Problem loading json from %s" % url)
-            return None, None
+            return None, source_site_url
 
     else:
 
         app_logger_instance.info(u"Problem downloading json content from %s" % url)
-        return None, None
+        return None, source_site_url
 
     try:
 
@@ -740,17 +754,10 @@ def aor_apps(source_app_name, user_agent):
         # construct app version
         current_version = "%s-%s" % (pkgver, pkgrel)
 
-        # get repo name and arch type (used in url construct for email notification)
-        source_repo_name = content[0]['repo']
-        source_arch_name = content[0]['arch']
-
     except (ValueError, TypeError, KeyError, IndexError):
 
         app_logger_instance.info(u"Problem parsing json from %s, skipping to next iteration..." % url)
-        return None, None
-
-    # construct url for package details
-    source_site_url = "https://www.archlinux.org/packages/%s/%s/%s/" % (source_repo_name, source_arch_name, source_app_name)
+        return None, source_site_url
 
     return current_version, source_site_url
 
