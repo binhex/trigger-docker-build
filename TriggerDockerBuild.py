@@ -616,7 +616,7 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
     return current_version, source_site_url
 
 
-def gitlab_apps(source_app_name, source_repo_name, source_site_name, source_project_id, source_branch_name, source_query_type, user_agent):
+def gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent):
 
     # use gitlab rest api
     url = 'https://gitlab.com/api/v4/projects/%s/repository/commits/%s' % (source_project_id, source_branch_name)
@@ -931,7 +931,7 @@ def monitor_sites():
                 app_logger_instance.warning(u"Site '%s' marked as down, skipping processing for application '%s'..." % (source_site_name, source_app_name))
                 continue
 
-            current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_site_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome)
+            current_version, source_site_url = gitlab_apps(source_app_name, source_repo_name, source_project_id, source_branch_name, source_query_type, user_agent_chrome)
 
             if current_version is None:
 
