@@ -37,7 +37,7 @@ jobs:
             config_file_desc='trigger-docker-build-config'
             gist_id=$(gh gist list --secret | grep -P -m 1 "${config_file_desc}" | awk -F ' ' '{ print $1 }')
             echo "gist_id=$gist_id" >> $GITHUB_OUTPUT
-        id: get_gist_id
+          id: get_gist_id
       - name: Change directory to workspace
         shell: bash
         run: |
