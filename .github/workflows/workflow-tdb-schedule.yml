@@ -70,7 +70,7 @@ jobs:
           attempt_limit: 3
           attempt_delay: 600000
           command: |
-            gh gist create './configs/config.ini' --desc 'trigger-docker-build-config'
+            gh gist create './configs/config.ini' --desc 'trigger-docker-build-config' >/dev/null 2>&1
       - name: Delete previous Gist
         uses: Wandalen/wretry.action@v3
         with:
