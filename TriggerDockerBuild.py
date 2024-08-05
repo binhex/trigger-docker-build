@@ -149,13 +149,9 @@ def notification_email(**kwargs):
     previous_version = kwargs.get("previous_version")
     current_version = kwargs.get("current_version")
 
-    # read email config
-    config_email_username = config_obj["notification"]["email_username"]
-    config_email_to = config_obj["notification"]["email_to"]
-
     if msg_type == "site_error":
 
-        yag = yagmail.SMTP(config_email_username, email_password)
+        yag = yagmail.SMTP(email_username, email_password)
         subject = '%s - %s' % (source_site_name, msg_type)
         html = '''
         <b>Source Site Name:</b> %s<br>
@@ -165,7 +161,7 @@ def notification_email(**kwargs):
 
     elif msg_type == "config_error" or msg_type == "app_error":
 
-        yag = yagmail.SMTP(config_email_username, email_password)
+        yag = yagmail.SMTP(email_username, email_password)
         subject = '%s - %s' % (source_app_name, msg_type)
         html = '''
         <b>Source Site Name:</b> %s<br>
@@ -187,7 +183,7 @@ def notification_email(**kwargs):
         # construct url to github container registry details
         github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (target_repo_owner, target_repo_name)
 
-        yag = yagmail.SMTP(config_email_username, email_password)
+        yag = yagmail.SMTP(email_username, email_password)
         subject = '%s [%s] - updated to %s' % (source_app_name, action, current_version)
         html = '''
         <b>Action:</b> %s<br>
@@ -210,11 +206,11 @@ def notification_email(**kwargs):
     try:
 
         app_logger_instance.info(u'Sending email notification...')
-        yag.send(to=config_email_to, subject=subject, contents=[html])
+        yag.send(to=email_to, subject=subject, contents=[html])
 
     except Exception:
 
-        app_logger_instance.warning(u"Failed to send E-Mail notification to %s" % config_email_to)
+        app_logger_instance.warning(u"Failed to send E-Mail notification to %s" % email_to)
         return 1
 
 
@@ -1336,12 +1332,14 @@ if __name__ == '__main__':
             sys.exit(2)
 
     # setup argparse description and usage, also increase spacing for help to 50
-    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-password <password>] [--target-access-token <token>] [--gitlab-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
+    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-to <email address>] [--email-username <username>] [--email-password <password>] [--target-access-token <token>] [--gitlab-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
 
     # add argparse command line flags
     commandline_parser.add_argument(u"--config", metavar=u"<path>", help=u"specify path for config file e.g. --config /opt/triggerdockerbuild/config/")
     commandline_parser.add_argument(u"--logs", metavar=u"<path>", help=u"specify path for log files e.g. --logs /opt/triggerdockerbuild/logs/")
     commandline_parser.add_argument(u"--kodi-password", metavar=u"<password>", help=u"specify the password to access kodi e.g. --kodi-password foo")
+    commandline_parser.add_argument(u"--email-to", metavar=u"<email address>", help=u"specify the email address to send email notifications to e.g. --email-to foo@bar.com")
+    commandline_parser.add_argument(u"--email-username", metavar=u"<username>", help=u"specify the email account username e.g. --email-username foo@bar.com")
     commandline_parser.add_argument(u"--email-password", metavar=u"<password>", help=u"specify the email account password e.g. --email-password foo")
     commandline_parser.add_argument(u"--target-access-token", metavar=u"<token>", help=u"specify the github personal access token e.g. --target-access-token 123456789")
     commandline_parser.add_argument(u"--gitlab-access-token", metavar=u"<token>", help=u"specify the gitlab personal access token e.g. --gitlab-access-token 123456789")
@@ -1418,6 +1416,32 @@ if __name__ == '__main__':
     else:
 
         app_logger_instance.info(u"Email Notification is not defined via '--email-notification' or 'config.ini', assuming True")
+        email_notification = False
+
+    if args["email_to"]:
+
+        email_to = args["email_to"]
+
+    elif config_obj["notification"]["email_to"] is not None:
+
+        email_to = config_obj["notification"]["email_to"]
+
+    else:
+
+        app_logger_instance.info(u"Email To is not defined via '--email-to' or 'config.ini', setting Email Notification to false")
+        email_notification = False
+
+    if args["email_username"]:
+
+        email_username = args["email_username"]
+
+    elif config_obj["notification"]["email_username"] is not None:
+
+        email_username = config_obj["notification"]["email_username"]
+
+    else:
+
+        app_logger_instance.info(u"Email Username is not defined via '--email-username' or 'config.ini', setting Email Notification to false")
         email_notification = False
 
     if args["email_password"]:
