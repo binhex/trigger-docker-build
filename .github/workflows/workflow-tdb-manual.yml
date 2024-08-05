@@ -59,6 +59,8 @@ jobs:
             --config ./configs \
             --logs ./logs \
             --email-notification \
+            --email-to "${{ secrets.EMAIL_ADDRESS }}" \
+            --email-username "${{ secrets.EMAIL_ADDRESS }}" \
             --email-password "${{ secrets.EMAIL_PASSWORD }}" \
             --target-access-token "${{ secrets.TDB_PAT }}" \
             --gitlab-access-token "${{ secrets.GITLAB_TOKEN }}"
