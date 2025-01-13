@@ -55,7 +55,8 @@ jobs:
           attempt_limit: 3
           attempt_delay: 600000
           command: |
-            python3 ./lib/pex/TriggerDockerBuild.pex ./TriggerDockerBuild.py \
+            pip install -r ./requirements.txt
+            python3 ./TriggerDockerBuild.py \
             --config ./configs \
             --logs ./logs \
             --email-notification \
