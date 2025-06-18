@@ -851,7 +851,6 @@ def monitor_sites():
     app_down_pypi_counter = 0
     app_down_aor_counter = 0
     app_down_aur_counter = 0
-    app_down_soup_counter = 0
 
     # set maximum number of email notifications for failed downloads before skipping
     app_down_counter_max = 3
@@ -909,9 +908,7 @@ def monitor_sites():
                 if app_down_github_counter <= app_down_counter_max:
 
                     msg_type = "app_error"
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
-                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
-                                       source_site_url=source_site_url)
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
                 else:
 
@@ -940,9 +937,7 @@ def monitor_sites():
                 if app_down_gitlab_counter <= app_down_counter_max:
 
                     msg_type = "app_error"
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
-                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
-                                       source_site_url=source_site_url)
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
                 else:
 
@@ -971,9 +966,7 @@ def monitor_sites():
                 if app_down_pypi_counter <= app_down_counter_max:
 
                     msg_type = "app_error"
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
-                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
-                                       source_site_url=source_site_url)
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
                 else:
 
@@ -1007,9 +1000,7 @@ def monitor_sites():
                 if app_down_aor_counter <= app_down_counter_max:
 
                     msg_type = "app_error"
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
-                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
-                                       source_site_url=source_site_url)
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
                 else:
 
@@ -1038,9 +1029,7 @@ def monitor_sites():
                 if app_down_aur_counter <= app_down_counter_max:
 
                     msg_type = "app_error"
-                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
-                                       source_repo_name=source_repo_name, source_app_name=source_app_name,
-                                       source_site_url=source_site_url)
+                    notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
 
                 else:
 
@@ -1053,67 +1042,48 @@ def monitor_sites():
 
             if source_app_name == "minecraftbedrock":
 
-                source_site_url = "https://www.minecraft.net/en-us/download/server/bedrock"
-                soup = soup_regex(source_site_url, user_agent_chrome)
+                request_type = "get"
+                bedrock_unofficial_api = 'https://net-secondary.web.minecraft-services.net/api/v1.0/download/links'
+                return_code, status_code, content = http_client(url=bedrock_unofficial_api, user_agent=user_agent_chrome, request_type=request_type)
 
-                if soup is None:
-
-                    error_msg = f"Unable to connect to site '{source_site_name}' for application '{source_app_name}', skipping to next iteration..."
-
-                    # increment counter for number of failed app detail downloads
-                    app_down_soup_counter += 1
-
-                    # if number of failed app package detail downloads above limit then silence email notifications
-                    if app_down_soup_counter <= app_down_counter_max:
-
-                        msg_type = "app_error"
-                        notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name,
-                                           source_repo_name=source_repo_name, source_app_name=source_app_name,
-                                           source_site_url=source_site_url)
-
-                    else:
-
-                        app_logger_instance.info(f"Number of failed downloads for site '{source_site_name}' has exceeded '{app_down_counter_max}', skipping notifications")
-
-                    app_logger_instance.warning(error_msg)
-                    continue
-
-                try:
-
-                    # get download url from soup
-                    url_line = soup.select('a[data-platform="serverBedrockLinux"]')
-                    download_url = url_line[0]['href']
-
-                except (IndexError, KeyError):
+                if return_code != 0:
 
                     msg_type = "app_error"
-                    error_msg = u"Unable to identify download url using beautiful soup for app %s, skipping to next iteration..." % source_app_name
+                    error_msg = u"Unable to get bedrock download links from API for app %s, skipping to next iteration..." % source_app_name
                     notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                     app_logger_instance.warning(error_msg)
                     continue
 
-                try:
+                else:
 
-                    # get app version from soup
-                    current_version = re.search(r"[\d.]+(?=.zip)", download_url).group()
+                    try:
+                        # Parse the JSON response
+                        api_data = json.loads(content)
 
-                except (IndexError, KeyError):
+                        # Find the serverBedrockLinux entry
+                        download_url = None
+                        for link_item in api_data['result']['links']:
+                            if link_item['downloadType'] == 'serverBedrockLinux':
+                                download_url = link_item['downloadUrl']
+                                break
 
-                    request_type = "get"
-                    github_fallback_version_url = "https://raw.githubusercontent.com/ich777/docker-minecraft-bedrock/master/version"
-                    return_code, status_code, content = http_client(url=github_fallback_version_url, user_agent=user_agent_chrome, request_type=request_type)
+                        if not download_url:
+                            raise KeyError("serverBedrockLinux not found in API response")
 
-                    if return_code != 0:
+                        # Extract version from the download URL using regex
+                        # URL format: https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.90.4.zip
+                        version_match = re.search(r'bedrock-server-(.*)\.zip', download_url)
+                        if version_match:
+                            current_version = version_match.group(1)
+                        else:
+                            raise ValueError("Could not extract version from download URL")
 
+                    except (json.JSONDecodeError, KeyError, ValueError) as e:
                         msg_type = "app_error"
-                        error_msg = u"Unable to identify app version using beautiful soup for app %s, skipping to next iteration..." % source_app_name
+                        error_msg = u"Unable to parse bedrock API response for app %s: %s" % (source_app_name, str(e))
                         notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=source_site_name, source_repo_name=source_repo_name, source_app_name=source_app_name, source_site_url=source_site_url)
                         app_logger_instance.warning(error_msg)
                         continue
-
-                    else:
-
-                        current_version = content
 
             elif source_app_name == "minecraftserver":
 
@@ -1243,18 +1213,18 @@ def monitor_sites():
 
                     # TODO this is a hack to work around the fact we have converted dict to keyword args
                     regex_code = r'(?<="code":\s")[^"]+'
-                    code = (re.search(regex_code, str(content))).group(0)
 
-                    if code.lower() == "already_exists":
+                    try:
+                        code = (re.search(regex_code, str(content))).group(0)
+                        if code.lower() == "already_exists":
 
-                        app_logger_instance.warning(u"Problem creating GitHub release as it already exists for '%s/%s', overwriting current version and skipping to next iteration..." % (target_repo_owner, target_repo_name))
-                        app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
-                        config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
-                        config_obj.write()
+                            app_logger_instance.warning(u"Problem creating GitHub release as it already exists for '%s/%s', overwriting current version and skipping to next iteration..." % (target_repo_owner, target_repo_name))
+                            app_logger_instance.debug(u"Writing current version %s to config.ini" % current_version)
+                            config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = current_version
+                            config_obj.write()
 
-                    else:
-
-                        app_logger_instance.warning(u"Problem creating GitHub release due to error '%s' for '%s/%s', skipping to next iteration..." % (code, target_repo_owner, target_repo_name))
+                    except AttributeError:
+                        app_logger_instance.warning(u"Problem creating GitHub release due to unknown error for '%s/%s', skipping to next iteration..." % (target_repo_owner, target_repo_name))
 
                     continue
 
