@@ -13,4 +13,4 @@ six==1.17.0
 yagmail==0.15.293
 pytz==2024.2
 tzlocal==5.2
-urllib3==2.3.0
+urllib3==2.5.0
