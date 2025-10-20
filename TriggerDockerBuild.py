@@ -1302,7 +1302,7 @@ if __name__ == '__main__':
             sys.exit(2)
 
     # setup argparse description and usage, also increase spacing for help to 50
-    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-to <email address>] [--email-username <username>] [--email-password <password>] [--target-access-token <token>] [--gitlab-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
+    commandline_parser = ArgparseCustom(prog="TriggerDockerBuild", description="%(prog)s " + version, usage="%(prog)s [--help] [--config <path>] [--logs <path>] [--kodi-password <password>] [--email-to <email address>] [--email-username <username>] [--email-password <password>] [--target-access-token <token>] [--pidfile <path>] [--kodi-notification] [--email-notification] [--schedule] [--daemon] [--version]", formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50))
 
     # add argparse command line flags
     commandline_parser.add_argument(u"--config", metavar=u"<path>", help=u"specify path for config file e.g. --config /opt/triggerdockerbuild/config/")
@@ -1312,7 +1312,6 @@ if __name__ == '__main__':
     commandline_parser.add_argument(u"--email-username", metavar=u"<username>", help=u"specify the email account username e.g. --email-username foo@bar.com")
     commandline_parser.add_argument(u"--email-password", metavar=u"<password>", help=u"specify the email account password e.g. --email-password foo")
     commandline_parser.add_argument(u"--target-access-token", metavar=u"<token>", help=u"specify the github personal access token e.g. --target-access-token 123456789")
-    commandline_parser.add_argument(u"--gitlab-access-token", metavar=u"<token>", help=u"specify the gitlab personal access token e.g. --gitlab-access-token 123456789")
     commandline_parser.add_argument(u"--kodi-notification", action=u"store_true", help=u"enable kodi notification e.g. --kodi-notification")
     commandline_parser.add_argument(u"--email-notification", action=u"store_true", help=u"enable email notification e.g. --email-notification")
     commandline_parser.add_argument(u"--pidfile", metavar=u"<path>", help=u"specify path to pidfile e.g. --pid /var/run/triggerdockerbuild/triggerdockerbuild.pid")
@@ -1465,19 +1464,6 @@ if __name__ == '__main__':
 
         app_logger_instance.warning(u"Target Access Token is not defined via '--target-access-token' or 'config.ini', exiting script...")
         exit(1)
-
-    if args["gitlab_access_token"]:
-
-        gitlab_access_token = args["gitlab_access_token"]
-
-    elif config_obj["general"]["gitlab_access_token"] is not None:
-
-        gitlab_access_token = config_obj["general"]["gitlab_access_token"]
-
-    else:
-
-        app_logger_instance.info(u"GitLab Access Token is not defined via '--gitlab-access-token' or 'config.ini'")
-        gitlab_access_token = None
 
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
