@@ -63,8 +63,7 @@ jobs:
             --email-to "${{ secrets.EMAIL_ADDRESS }}" \
             --email-username "${{ secrets.EMAIL_ADDRESS }}" \
             --email-password "${{ secrets.EMAIL_PASSWORD }}" \
-            --target-access-token "${{ secrets.TDB_PAT }}" \
-
+            --target-access-token "${{ secrets.TDB_PAT }}"
       - name: Create Gist
         uses: Wandalen/wretry.action@v3
         with:
