@@ -15,6 +15,7 @@ import daemon
 import kodijson
 import requests
 import schedule
+import urllib3
 import validate
 import yagmail
 from bs4 import BeautifulSoup
@@ -38,6 +39,18 @@ _app_down_counters: dict = {}
 # Set to False in config.ini only when behind an SSL-inspection proxy that uses
 # self-signed certificates (e.g. corporate MITM).
 verify_ssl = True
+
+
+def _silence_tls_warnings(verify_ssl_enabled):
+    """Suppress urllib3's InsecureRequestWarning when TLS verification is off.
+
+    When the user explicitly sets verify_ssl = False (e.g. behind an
+    SSL-inspection proxy), the resulting InsecureRequestWarning for every HTTPS
+    request is expected noise. Keep warnings visible whenever verification is
+    enabled (the secure default) so TLS problems are never hidden.
+    """
+    if not verify_ssl_enabled:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def create_config():
@@ -385,12 +398,30 @@ def http_client(**kwargs):
         # construct class.method from request_type
         request_method = getattr(session, request_type)
 
-        # use keyword argument unpack to convert dict to keyword args
-        response = request_method(**requests_data_dict)
+        # Transient server errors (5xx) may succeed on retry — e.g. 502/503/504
+        # when a source site is under load (DDoS). Retry a bounded number of
+        # times with a short delay. Client errors (4xx) are never retried and
+        # fall through to the status-code handling below.
+        transient_statuses = (502, 503, 504)
+        max_attempts = 3
+        retry_delay_secs = 5
 
-        # get status code and content returned
-        status_code = response.status_code
-        content = response.content
+        for attempt in range(max_attempts):
+            # use keyword argument unpack to convert dict to keyword args
+            response = request_method(**requests_data_dict)
+
+            # get status code and content returned
+            status_code = response.status_code
+            content = response.content
+
+            if status_code in transient_statuses and attempt < max_attempts - 1:
+                app_logger_instance.warning(
+                    "Transient HTTP status %s from %s, retrying (%d/%d)..."
+                    % (status_code, url, attempt + 1, max_attempts)
+                )
+                time.sleep(retry_delay_secs)
+            else:
+                break
 
         if status_code == 401:
             app_logger_instance.warning(
@@ -1502,7 +1533,7 @@ def scheduler_start():
 
 # required to prevent separate process from trying to load parent process
 if __name__ == "__main__":
-    version = "1.2.2"
+    version = "1.2.3"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
@@ -1714,6 +1745,9 @@ if __name__ == "__main__":
     # Verify TLS certificates by default; allow opt-out for SSL-inspection environments.
     # The configspec defines boolean(default=True), so the key is always present.
     verify_ssl = config_obj["general"]["verify_ssl"]
+
+    # Silence urllib3 InsecureRequestWarning only when verification is disabled
+    _silence_tls_warnings(verify_ssl)
 
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
