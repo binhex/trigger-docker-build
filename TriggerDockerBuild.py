@@ -343,6 +343,14 @@ def http_client(**kwargs):
         else:
             data_payload = None
 
+        # JSON payload dict — sent via requests json= kwarg which automatically
+        # sets Content-Type: application/json (required by the GitHub API).
+        if "json_payload" in kwargs:
+            json_payload = kwargs["json_payload"]
+
+        else:
+            json_payload = None
+
     else:
         app_logger_instance.warning("No keyword args sent to function, exiting function...")
         return 1, None, None
@@ -387,13 +395,13 @@ def http_client(**kwargs):
         if "auth" in kwargs:
             session.auth = auth
 
-        if request_type == "put":
+        if request_type in ("put", "post"):
             # add additional keyword arguments
-            requests_data_dict.update({"data": data_payload})
-
-        elif request_type == "post":
-            # add additional keyword arguments
-            requests_data_dict.update({"data": data_payload})
+            if json_payload is not None:
+                # requests json= kwarg sets Content-Type: application/json
+                requests_data_dict.update({"json": json_payload})
+            else:
+                requests_data_dict.update({"data": data_payload})
 
         # construct class.method from request_type
         request_method = getattr(session, request_type)
@@ -487,8 +495,8 @@ def http_client(**kwargs):
 def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent):
     """Create a GitHub release via the REST API.
 
-    Uses json.dumps() to safely construct the JSON payload, avoiding injection
-    risks from version strings containing special characters (e.g. ':', '"', '\\').
+    Sends JSON via requests json= kwarg which automatically sets
+    Content-Type: application/json (required by the GitHub API).
 
     Returns (return_code, status_code, content).
     """
@@ -503,16 +511,16 @@ def github_create_release(current_version, target_repo_branch, target_repo_owner
     github_release_body = github_tag_name
     request_type = "post"
     http_url = "https://api.github.com/repos/%s/%s/releases" % (target_repo_owner, target_repo_name)
-    data_payload = json.dumps(
-        {
-            "tag_name": github_tag_name,
-            "target_commitish": target_repo_branch,
-            "name": github_release_name,
-            "body": github_release_body,
-            "draft": False,
-            "prerelease": False,
-        }
-    )
+    # JSON dict sent via requests json= kwarg → Content-Type: application/json
+    # (required by the GitHub API; data= without the header causes 422 errors)
+    json_payload = {
+        "tag_name": github_tag_name,
+        "target_commitish": target_repo_branch,
+        "name": github_release_name,
+        "body": github_release_body,
+        "draft": False,
+        "prerelease": False,
+    }
 
     # process post request
     return_code, status_code, content = http_client(
@@ -520,7 +528,7 @@ def github_create_release(current_version, target_repo_branch, target_repo_owner
         user_agent=user_agent,
         additional_header={"Authorization": "token %s" % target_access_token},
         request_type=request_type,
-        data_payload=data_payload,
+        json_payload=json_payload,
     )
     return return_code, status_code, content
 
