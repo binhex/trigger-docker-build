@@ -29,6 +29,11 @@ Not supported
 site_list = [{'source_site_name': '<github|gitlab|pypi|aor|aur|regex>', 'source_repo_name': '<repo_name>', 'source_app_name': '<app_name>', 'source_query_type': 'release|tag|pre-release|branch', 'source_branch_name': '<branch>', 'target_repo_name': '<repo_name>', 'action': '<notify|trigger>', 'target_release_days': '<days>', 'grace_period_mins': '<mins>'}]
 ```
 
+The `[general]` section supports these settings:
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `verify_ssl` | boolean | `True` | Set to `False` only when behind an SSL-inspection proxy that uses self-signed certificates |
+
 **Usage:**
 ```
 python3 ./TriggerDockerBuild.py --config ./configs --logs ./logs

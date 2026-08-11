@@ -34,6 +34,11 @@ _site_down_state: dict = {}
 # Keyed by site_name (str); reset to 0 when any app for that site succeeds.
 _app_down_counters: dict = {}
 
+# Whether to verify TLS certificates on HTTPS requests. Defaults to True (secure).
+# Set to False in config.ini only when behind an SSL-inspection proxy that uses
+# self-signed certificates (e.g. corporate MITM).
+verify_ssl = True
+
 
 def create_config():
 
@@ -340,7 +345,9 @@ def http_client(**kwargs):
 
     # Default to verifying SSL certificates. Users behind proxies with custom CA bundles
     # can set REQUESTS_CA_BUNDLE or SSL_CERT_FILE environment variables instead of disabling.
-    verify_ssl = kwargs.get("verify_ssl", True) if kwargs else True
+    # Set verify_ssl = False in config.ini to disable verification entirely
+    # (only for environments with self-signed certs from SSL-inspection proxies).
+    effective_verify_ssl = kwargs.get("verify_ssl", globals().get("verify_ssl", True))
 
     # set status_code and content to None in case nothing returned
     status_code = None
@@ -351,7 +358,7 @@ def http_client(**kwargs):
             "url": url,
             "timeout": (connect_timeout, read_timeout),
             "allow_redirects": True,
-            "verify": verify_ssl,
+            "verify": effective_verify_ssl,
         }
 
         # define default headers to compress and fake user agent
@@ -1495,7 +1502,7 @@ def scheduler_start():
 
 # required to prevent separate process from trying to load parent process
 if __name__ == "__main__":
-    version = "1.2.1"
+    version = "1.2.2"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
@@ -1703,6 +1710,10 @@ if __name__ == "__main__":
             "Target Access Token is not defined via '--target-access-token' or 'config.ini', exiting script..."
         )
         exit(1)
+
+    # Verify TLS certificates by default; allow opt-out for SSL-inspection environments.
+    # The configspec defines boolean(default=True), so the key is always present.
+    verify_ssl = config_obj["general"]["verify_ssl"]
 
     # check os is not windows and then run main process as daemonized process
     if args["daemon"] is True and os.name != "nt":
