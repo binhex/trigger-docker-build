@@ -41,14 +41,15 @@ jobs:
         run: |
           cd "${GITHUB_WORKSPACE}"
       - name: Download config from secret Gist
-        uses: Wandalen/wretry.action@v3
-        with:
-          attempt_limit: 3
-          attempt_delay: 600000
-          command: |
-            echo "[debug] Gist ID is '${{ steps.get_gist_id.outputs.gist_id }}'"
+        shell: bash
+        run: |
+          echo "[debug] Gist ID is '${{ steps.get_gist_id.outputs.gist_id }}'"
+          if [ -n "${{ steps.get_gist_id.outputs.gist_id }}" ]; then
             gh gist clone "${{ steps.get_gist_id.outputs.gist_id }}" '/tmp/gist'
             cp '/tmp/gist/config.ini' './configs'
+          else
+            echo "[info] No existing config gist found — using default config.ini for this run"
+          fi
       - name: Run Trigger Docker Builds (TDB)
         uses: Wandalen/wretry.action@v3
         with:
@@ -78,8 +79,3 @@ jobs:
           attempt_delay: 600000
           command: |
             gh gist delete ${{ steps.get_gist_id.outputs.gist_id }} --yes
-      - name: Debug
-        shell: bash
-        run: |
-          echo "[debug] file contents of config file 'config.ini' is..." && cat './configs/config.ini'
-          echo "[debug] file contents of log file 'app.log' is..." && cat './logs/app.log'

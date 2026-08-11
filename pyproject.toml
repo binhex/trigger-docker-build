@@ -1,0 +1,27 @@
+[project]
+name = "TriggerDockerBuild"
+version = "1.2.1"
+description = "Monitor GitHub/AOR/AUR for version changes and trigger Docker image builds"
+requires-python = ">=3.6"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+# UP031 (percent-format → f-string) conflicts with the project-wide convention:
+# the entire legacy codebase uses '%' formatting throughout TriggerDockerBuild.py.
+# Per AGENTS.md, project-local conventions take precedence over defaults.
+ignore = ["UP031"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+strict_optional = true
+# Third-party libs without published stubs (configobj, daemon, kodijson, validate,
+# yagmail, bs4). These are runtime dependencies with no py.typed marker available.
+ignore_missing_imports = true
