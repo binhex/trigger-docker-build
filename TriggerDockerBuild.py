@@ -1541,7 +1541,7 @@ def scheduler_start():
 
 # required to prevent separate process from trying to load parent process
 if __name__ == "__main__":
-    version = "1.2.3"
+    version = "1.2.4"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):
