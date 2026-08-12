@@ -530,6 +530,28 @@ def github_create_release(current_version, target_repo_branch, target_repo_owner
         request_type=request_type,
         json_payload=json_payload,
     )
+
+    # GitHub returns a misleading 422 "tag_name is not a valid tag" when the
+    # configured target_repo_branch does not exist on the target repo (e.g.
+    # 'master' when the repo only has 'main'). Fall back to an empty
+    # target_commitish, which GitHub auto-maps to the repo's default branch.
+    if return_code != 0 and status_code == 422:
+        app_logger_instance.warning(
+            "Release creation failed with 422 for branch '%s', "
+            "retrying with the repo's default branch..." % target_repo_branch
+        )
+        # Build a fresh payload so the fallback call cannot share mutation
+        # with the first attempt's recorded request.
+        fallback_payload = dict(json_payload)
+        fallback_payload["target_commitish"] = ""
+        return_code, status_code, content = http_client(
+            url=http_url,
+            user_agent=user_agent,
+            additional_header={"Authorization": "token %s" % target_access_token},
+            request_type=request_type,
+            json_payload=fallback_payload,
+        )
+
     return return_code, status_code, content
 
 
@@ -1541,7 +1563,7 @@ def scheduler_start():
 
 # required to prevent separate process from trying to load parent process
 if __name__ == "__main__":
-    version = "1.2.4"
+    version = "1.2.5"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):

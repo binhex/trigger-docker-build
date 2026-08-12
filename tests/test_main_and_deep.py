@@ -70,7 +70,7 @@ class TestMainBlock:
         result = subprocess.run(
             [sys.executable, "TriggerDockerBuild.py", "--version"], capture_output=True, text=True, timeout=10
         )
-        assert "1.2.4" in result.stdout or "1.2.4" in result.stderr
+        assert "1.2.5" in result.stdout or "1.2.5" in result.stderr
 
     def test_basic_run_with_temp_config(self, tmp_path):
         """Run with a temp config directory (no real network needed — will fail gracefully)."""
