@@ -1,39 +1,9 @@
-"""Tests for soup_regex and monitor_sites."""
+"""Tests for monitor_sites."""
 
 import json
 from unittest.mock import MagicMock
 
 import pytest
-
-
-class TestSoupRegex:
-    """soup_regex(source_site_url, user_agent)."""
-
-    def test_returns_soup_and_url_on_success(self, tdb, mock_http):
-        mock_http.get.return_value.status_code = 200
-        mock_http.get.return_value.content = b"<html><body><p>test</p></body></html>"
-
-        soup, url = tdb.soup_regex("https://example.com", "agent/1.0")
-        assert soup is not None
-        assert url == "https://example.com"
-        assert soup.body.p.text == "test"
-
-    def test_http_error_returns_none_tuple(self, tdb, mock_http):
-        mock_http.get.return_value.status_code = 404
-        mock_http.get.return_value.content = b"not found"
-
-        soup, url = tdb.soup_regex("https://example.com", "agent/1.0")
-        assert soup is None
-        assert url is None
-
-    def test_bad_html_returns_none_tuple(self, tdb, mock_http):
-        """BeautifulSoup should handle any HTML, even bad — but only if HTTP succeeds."""
-        mock_http.get.return_value.status_code = 200
-        mock_http.get.return_value.content = b"not html but soup still works"
-
-        soup, url = tdb.soup_regex("https://example.com", "agent/1.0")
-        assert soup is not None
-        assert url == "https://example.com"
 
 
 class TestMonitorSites:

@@ -1,6 +1,6 @@
 [project]
 name = "TriggerDockerBuild"
-version = "1.2.5"
+version = "1.2.6"
 description = "Monitor GitHub/AOR/AUR for version changes and trigger Docker image builds"
 requires-python = ">=3.6"
 

@@ -104,15 +104,11 @@ class TestCheckSite:
             user_agent="agent/1.0",
             site_name="PyPI",
         )
-        # Check that session.headers.update was called with None or empty
-        session_instance = mock_http.return_value
-        # The additional_header should not contain Authorization for PyPI
-        all_update_calls = [c for c in session_instance.headers.update.call_args_list]
-        for call_args in all_update_calls:
-            header = call_args[0][0] if call_args[0] else {}
-            if isinstance(header, dict) and "Authorization" in header:
-                # This is the Accept-encoding/User-Agent update, not auth
-                pass
+        # No Authorization header should ever be set for a non-GitHub site
+        for call in mock_http.headers.update.call_args_list:
+            header = call[0][0] if call[0] else {}
+            if isinstance(header, dict):
+                assert "Authorization" not in header
 
 
 class TestGithubCreateRelease:
@@ -127,11 +123,10 @@ class TestGithubCreateRelease:
         assert status_code == 201
 
     def test_colon_in_version_replaced_with_dot(self, tdb, mock_http):
-        """Colons in version numbers are replaced with dots."""
+        """Colons in version numbers are replaced with dots in the tag name."""
         mock_http.post.return_value.status_code = 201
         mock_http.post.return_value.content = b"ok"
 
         tdb.github_create_release("1.0:beta", "main", "owner", "repo", "agent/1.0")
-        # Check the URL uses the sanitized tag_name
-        posted_url = mock_http.post.call_args[1].get("url", "")
-        assert ":" not in posted_url or "1.0.beta" in str(mock_http.post.call_args)
+        json_kwarg = mock_http.post.call_args.kwargs.get("json")
+        assert json_kwarg["tag_name"] == "1.0.beta-01"

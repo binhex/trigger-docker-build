@@ -67,7 +67,7 @@ class TestMainHelpVersion:
 
     def test_version(self, project_copy):
         r = _run(project_copy, "--version")
-        assert "1.2.5" in r.stdout or "1.2.5" in r.stderr
+        assert "1.2.6" in r.stdout or "1.2.6" in r.stderr
 
 
 # ── config / log path handling ─────────────────────────────────────────

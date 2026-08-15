@@ -4,9 +4,16 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Virtual environment
 .venv/
+
+# Pi sub-agent scratch artifacts
+.pi-subagents/
 
 # Config with secrets (tracked via private Gist, not in repo)
 configs/config.ini

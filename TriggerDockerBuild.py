@@ -18,7 +18,6 @@ import schedule
 import urllib3
 import validate
 import yagmail
-from bs4 import BeautifulSoup
 
 signal.signal(signal.SIGINT, signal.default_int_handler)  # ensure we correctly handle all keyboard interrupts
 
@@ -87,6 +86,20 @@ def time_check(current_time, grace_period_mins, source_version_change_datetime):
         return False
 
 
+def _resolve_log_level(log_level):
+    """Map a (case-insensitive) log level name to a logging module level.
+
+    Unknown values default to WARNING.
+    """
+    levels = {
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "DEBUG": logging.DEBUG,
+    }
+    return levels.get(str(log_level).upper(), logging.WARNING)
+
+
 def app_logging():
 
     # read log levels
@@ -111,24 +124,16 @@ def app_logging():
     # add the log message handler to the logger
     app_logger.addHandler(app_rotatingfilehandler)
 
-    # set level of logging from config (case-insensitive)
-    log_level_upper = log_level.upper()
+    # set level of logging from config (case-insensitive, defaults to WARNING)
+    resolved_level = _resolve_log_level(log_level)
+    app_logger.setLevel(resolved_level)
 
-    if log_level_upper == "INFO":
-        app_logger.setLevel(logging.INFO)
-
-    elif log_level_upper == "WARNING":
-        app_logger.setLevel(logging.WARNING)
-
-    elif log_level_upper == "ERROR":
-        app_logger.setLevel(logging.ERROR)
-
-    elif log_level_upper == "DEBUG":
-        app_logger.setLevel(logging.DEBUG)
-
-    else:
-        # unrecognised level — default to WARNING
-        app_logger.setLevel(logging.WARNING)
+    if resolved_level == logging.WARNING and str(log_level).upper() not in (
+        "INFO",
+        "WARNING",
+        "ERROR",
+        "DEBUG",
+    ):
         app_logger.warning("Unrecognised log level '%s', defaulting to WARNING" % log_level)
 
     # setup logging to console
@@ -140,20 +145,100 @@ def app_logging():
     # add handler for formatter to the console
     app_logger.addHandler(console_streamhandler)
 
-    # set level of logging from config for console (case-insensitive)
-    if log_level_upper == "INFO":
-        console_streamhandler.setLevel(logging.INFO)
-
-    elif log_level_upper == "WARNING":
-        console_streamhandler.setLevel(logging.WARNING)
-
-    elif log_level_upper == "ERROR":
-        console_streamhandler.setLevel(logging.ERROR)
-
-    elif log_level_upper == "DEBUG":
-        console_streamhandler.setLevel(logging.DEBUG)
+    # set level of logging from config for console
+    console_streamhandler.setLevel(resolved_level)
 
     return {"logger": app_logger, "handler": app_rotatingfilehandler}
+
+
+def _build_email_content(
+    msg_type,
+    action,
+    source_site_name,
+    source_repo_name,
+    source_app_name,
+    source_site_url,
+    error_msg,
+    previous_version,
+    current_version,
+    target_repo_name,
+):
+    """Build the (subject, html_body) for a notification email."""
+    if msg_type == "site_error":
+        subject = "%s - %s" % (source_site_name, msg_type)
+        html = """
+        <b>Source Site Name:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
+        <b>Error Message:</b> %s
+        """ % (source_site_name, source_site_url, source_site_name, error_msg)
+        return subject, html
+
+    if msg_type == "site_recovered":
+        subject = "%s - site recovered" % source_site_name
+        html = """
+        <b>Source Site Name:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
+        <b>Message:</b> %s
+        """ % (source_site_name, source_site_url, source_site_name, error_msg)
+        return subject, html
+
+    if msg_type in ("config_error", "app_error"):
+        subject = "%s - %s" % (source_app_name, msg_type)
+        html = """
+        <b>Source Site Name:</b> %s<br>
+        <b>Source Repository:</b> %s<br>
+        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
+        <b>Error Message:</b> %s
+        """ % (source_site_name, source_repo_name, source_site_url, source_app_name, error_msg)
+        return subject, html
+
+    # default: trigger/notify version-change email
+    target_repo_owner = config_obj["general"]["target_repo_owner"]
+    dockerhub_build_details = "https://hub.docker.com/r/%s/%s/tags?page=1&ordering=last_updated&name=latest" % (
+        target_repo_owner,
+        target_repo_name,
+    )
+    github_action_details = "https://github.com/%s/%s/actions" % (target_repo_owner, target_repo_name)
+    github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (
+        target_repo_owner,
+        target_repo_name,
+    )
+    subject = "%s [%s] - updated to %s" % (source_app_name, action, current_version)
+    html = """
+    <b>Action:</b> %s<br>
+    <b>Previous Version:</b> %s<br>
+    <b>Current Version:</b> %s<br>
+    <b>Source Site Name:</b> %s<br>
+    <b>Source Repository:</b> %s<br>
+    <b>Source Site URL:</b>  <a href="%s">%s</a>
+    """ % (
+        action,
+        previous_version,
+        current_version,
+        source_site_name,
+        source_repo_name,
+        source_site_url,
+        source_app_name,
+    )
+    if action == "trigger":
+        html += """
+        <b>Target Repository URL:</b> <a href="https://github.com/%s/%s">github repo</a><br>
+        <b>Target Github Action URL:</b> <a href="%s">github workflow</a><br>
+        <b>Target Github Container Registry URL:</b> <a href="%s">github registry</a><br>
+        <b>Target Docker Hub Registry URL:</b> <a href="%s">dockerhub registry</a>
+        """ % (
+            target_repo_owner,
+            target_repo_name,
+            github_action_details,
+            github_ghcr_details,
+            dockerhub_build_details,
+        )
+    return subject, html
+
+
+def _esc(value):
+    """HTML-escape a value, treating None/empty as an empty string."""
+    return _html.escape(value or "")
 
 
 def notification_email(**kwargs):
@@ -163,100 +248,35 @@ def notification_email(**kwargs):
         return 1
 
     # unpack arguments from dictionary and HTML-escape for safe email rendering
-    _e = _html.escape
     action = kwargs.get("action")
     msg_type = kwargs.get("msg_type")
-    error_msg = _e(kwargs.get("error_msg") or "")
-    source_app_name = _e(kwargs.get("source_app_name") or "")
-    source_repo_name = _e(kwargs.get("source_repo_name") or "")
-    source_site_name = _e(kwargs.get("source_site_name") or "")
+    error_msg = _esc(kwargs.get("error_msg"))
+    source_app_name = _esc(kwargs.get("source_app_name"))
+    source_repo_name = _esc(kwargs.get("source_repo_name"))
+    source_site_name = _esc(kwargs.get("source_site_name"))
     # Fall back to placeholder when source_site_url is None so emails don't render 'None'.
-    # Note: source_site_url is used in href attributes — do NOT escape it.
-    source_site_url = kwargs.get("source_site_url") or "(unknown)"
-    target_repo_name = _e(kwargs.get("target_repo_name") or "")
-    previous_version = _e(kwargs.get("previous_version") or "")
-    current_version = _e(kwargs.get("current_version") or "")
+    # Used in href attributes — HTML-escape with quote=True so a URL containing
+    # '"' cannot break out of the attribute (HTML injection).
+    source_site_url = _html.escape(kwargs.get("source_site_url") or "(unknown)", quote=True)
+    target_repo_name = _esc(kwargs.get("target_repo_name"))
+    previous_version = _esc(kwargs.get("previous_version"))
+    current_version = _esc(kwargs.get("current_version"))
 
-    if msg_type == "site_error":
-        yag = yagmail.SMTP(email_username, email_password)
-        subject = "%s - %s" % (source_site_name, msg_type)
-        html = """
-        <b>Source Site Name:</b> %s<br>
-        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
-        <b>Error Message:</b> %s
-        """ % (source_site_name, source_site_url, source_site_name, error_msg)
-
-    elif msg_type == "site_recovered":
-        yag = yagmail.SMTP(email_username, email_password)
-        subject = "%s - site recovered" % source_site_name
-        html = """
-        <b>Source Site Name:</b> %s<br>
-        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
-        <b>Message:</b> %s
-        """ % (source_site_name, source_site_url, source_site_name, error_msg)
-
-    elif msg_type == "config_error" or msg_type == "app_error":
-        yag = yagmail.SMTP(email_username, email_password)
-        subject = "%s - %s" % (source_app_name, msg_type)
-        html = """
-        <b>Source Site Name:</b> %s<br>
-        <b>Source Repository:</b> %s<br>
-        <b>Source Site URL:</b>  <a href="%s">%s</a><br>
-        <b>Error Message:</b> %s
-        """ % (source_site_name, source_repo_name, source_site_url, source_app_name, error_msg)
-
-    else:
-        target_repo_owner = config_obj["general"]["target_repo_owner"]
-
-        # construct url to docker hub build details
-        dockerhub_build_details = "https://hub.docker.com/r/%s/%s/tags?page=1&ordering=last_updated&name=latest" % (
-            target_repo_owner,
-            target_repo_name,
-        )
-
-        # construct url to github workflow details
-        github_action_details = "https://github.com/%s/%s/actions" % (target_repo_owner, target_repo_name)
-
-        # construct url to github container registry details
-        github_ghcr_details = "https://github.com/users/%s/packages/container/package/%s" % (
-            target_repo_owner,
-            target_repo_name,
-        )
-
-        yag = yagmail.SMTP(email_username, email_password)
-        subject = "%s [%s] - updated to %s" % (source_app_name, action, current_version)
-        html = """
-        <b>Action:</b> %s<br>
-        <b>Previous Version:</b> %s<br>
-        <b>Current Version:</b> %s<br>
-        <b>Source Site Name:</b> %s<br>
-        <b>Source Repository:</b> %s<br>
-        <b>Source Site URL:</b>  <a href="%s">%s</a>
-        """ % (
-            action,
-            previous_version,
-            current_version,
-            source_site_name,
-            source_repo_name,
-            source_site_url,
-            source_app_name,
-        )
-
-        if action == "trigger":
-            html += """
-            <b>Target Repository URL:</b> <a href="https://github.com/%s/%s">github repo</a><br>
-            <b>Target Github Action URL:</b> <a href="%s">github workflow</a><br>
-            <b>Target Github Container Registry URL:</b> <a href="%s">github registry</a><br>
-            <b>Target Docker Hub Registry URL:</b> <a href="%s">dockerhub registry</a>
-            """ % (
-                target_repo_owner,
-                target_repo_name,
-                github_action_details,
-                github_ghcr_details,
-                dockerhub_build_details,
-            )
+    subject, html = _build_email_content(
+        msg_type,
+        action,
+        source_site_name,
+        source_repo_name,
+        source_app_name,
+        source_site_url,
+        error_msg,
+        previous_version,
+        current_version,
+        target_repo_name,
+    )
 
     try:
+        yag = yagmail.SMTP(email_username, email_password)
         app_logger_instance.info("Sending email notification...")
         yag.send(to=email_to, subject=subject, contents=[html])
         return 0
@@ -264,8 +284,6 @@ def notification_email(**kwargs):
     except Exception:
         app_logger_instance.warning("Failed to send E-Mail notification to %s" % email_to)
         return 1
-
-    return 1
 
 
 # noinspection PyUnresolvedReferences
@@ -300,66 +318,124 @@ def notification_kodi(action, source_app_name, current_version):
         return 1
 
 
+def _parse_http_kwargs(kwargs):
+    """Validate and extract http_client arguments.
+
+    Returns a dict of parsed args, or None if a required argument is missing
+    or invalid (a warning is logged in that case).
+    """
+    if kwargs is None:
+        app_logger_instance.warning("No keyword args sent to function, exiting function...")
+        return None
+
+    url = kwargs.get("url")
+    if not url:
+        app_logger_instance.warning("No URL sent to function, exiting function...")
+        return None
+
+    user_agent = kwargs.get("user_agent")
+    if not user_agent:
+        app_logger_instance.warning("No User Agent sent to function, exiting function...")
+        return None
+
+    request_type = kwargs.get("request_type")
+    if request_type not in ("get", "put", "post"):
+        app_logger_instance.warning("Invalid or missing request type '%s', exiting function..." % request_type)
+        return None
+
+    return {
+        "url": url,
+        "user_agent": user_agent,
+        "request_type": request_type,
+        "auth": kwargs.get("auth"),
+        "additional_header": kwargs.get("additional_header"),
+        "data_payload": kwargs.get("data_payload"),
+        "json_payload": kwargs.get("json_payload"),
+    }
+
+
+def _check_http_status(status_code, url, content):
+    """Raise HTTPError for non-2xx responses, logging a specific message."""
+    if 200 <= status_code <= 299:
+        return
+
+    if status_code == 401:
+        message = "The status code %s indicates unauthorised access for %s, error is %s"
+    elif status_code == 404:
+        message = "The status code %s indicates the requested resource could not be found  for %s, error is %s"
+    elif status_code == 422:
+        message = (
+            "The status code %s indicates a request was well-formed but was unable "
+            "to be followed due to semantic errors for %s, error is %s"
+        )
+    else:
+        message = "The status code %s indicates an unexpected error for %s, error is %s"
+
+    app_logger_instance.warning(message % (status_code, url, content))
+    raise requests.exceptions.HTTPError(status_code, url, content)
+
+
+def _execute_http_request(
+    session, url, user_agent, request_type, auth, additional_header, data_payload, json_payload, verify_ssl
+):
+    """Build the request and execute it, retrying transient 5xx errors.
+
+    Returns (status_code, content).
+    """
+    connect_timeout = 60.0
+    read_timeout = 60.0
+
+    requests_data_dict = {
+        "url": url,
+        "timeout": (connect_timeout, read_timeout),
+        "allow_redirects": True,
+        "verify": verify_ssl,
+    }
+
+    session.headers.update({"Accept-encoding": "gzip", "User-Agent": user_agent})
+
+    if additional_header:
+        session.headers.update(additional_header)
+
+    if auth:
+        session.auth = auth
+
+    if request_type in ("put", "post"):
+        if json_payload is not None:
+            # requests json= kwarg sets Content-Type: application/json
+            requests_data_dict.update({"json": json_payload})
+        else:
+            requests_data_dict.update({"data": data_payload})
+
+    request_method = getattr(session, request_type)
+
+    transient_statuses = (502, 503, 504)
+    max_attempts = 3
+    retry_delay_secs = 5
+
+    for attempt in range(max_attempts):
+        response = request_method(**requests_data_dict)
+        status_code = response.status_code
+        content = response.content
+
+        if status_code in transient_statuses and attempt < max_attempts - 1:
+            app_logger_instance.warning(
+                "Transient HTTP status %s from %s, retrying (%d/%d)..." % (status_code, url, attempt + 1, max_attempts)
+            )
+            time.sleep(retry_delay_secs)
+        else:
+            return status_code, content
+
+    return status_code, content
+
+
 def http_client(**kwargs):
 
-    if kwargs is not None:
-        if "url" in kwargs:
-            url = kwargs["url"]
-
-        else:
-            app_logger_instance.warning("No URL sent to function, exiting function...")
-            return 1, None, None
-
-        if "user_agent" in kwargs:
-            user_agent = kwargs["user_agent"]
-
-        else:
-            app_logger_instance.warning("No User Agent sent to function, exiting function...")
-            return 1, None, None
-
-        if "request_type" in kwargs:
-            request_type = kwargs["request_type"]
-
-        else:
-            app_logger_instance.warning("No request type (get/put/post) sent to function, exiting function...")
-            return 1, None, None
-
-        # optional stuff to include
-        if "auth" in kwargs:
-            auth = kwargs["auth"]
-
-        else:
-            auth = None
-
-        if "additional_header" in kwargs:
-            additional_header = kwargs["additional_header"]
-
-        else:
-            additional_header = None
-
-        if "data_payload" in kwargs:
-            data_payload = kwargs["data_payload"]
-
-        else:
-            data_payload = None
-
-        # JSON payload dict — sent via requests json= kwarg which automatically
-        # sets Content-Type: application/json (required by the GitHub API).
-        if "json_payload" in kwargs:
-            json_payload = kwargs["json_payload"]
-
-        else:
-            json_payload = None
-
-    else:
-        app_logger_instance.warning("No keyword args sent to function, exiting function...")
+    parsed = _parse_http_kwargs(kwargs)
+    if parsed is None:
         return 1, None, None
 
-    # set connection timeout value (max time to wait for connection)
-    connect_timeout = 60.0
-
-    # set read timeout value (max time to wait between each byte)
-    read_timeout = 60.0
+    url = parsed["url"]
 
     # use a session instance to customize how "requests" handles making http requests
     session = requests.Session()
@@ -370,126 +446,33 @@ def http_client(**kwargs):
     # (only for environments with self-signed certs from SSL-inspection proxies).
     effective_verify_ssl = kwargs.get("verify_ssl", globals().get("verify_ssl", True))
 
-    # set status_code and content to None in case nothing returned
     status_code = None
 
     try:
-        # define dict of common arguments for requests
-        requests_data_dict = {
-            "url": url,
-            "timeout": (connect_timeout, read_timeout),
-            "allow_redirects": True,
-            "verify": effective_verify_ssl,
-        }
-
-        # define default headers to compress and fake user agent
-        session.headers.update({"Accept-encoding": "gzip", "User-Agent": user_agent})
-
-        if "additional_header" in kwargs:
-            additional_header = kwargs["additional_header"]
-
-            # Skip update when header is None/empty (e.g. non-GitHub site checks)
-            if additional_header:
-                session.headers.update(additional_header)
-
-        if "auth" in kwargs:
-            session.auth = auth
-
-        if request_type in ("put", "post"):
-            # add additional keyword arguments
-            if json_payload is not None:
-                # requests json= kwarg sets Content-Type: application/json
-                requests_data_dict.update({"json": json_payload})
-            else:
-                requests_data_dict.update({"data": data_payload})
-
-        # construct class.method from request_type
-        request_method = getattr(session, request_type)
-
-        # Transient server errors (5xx) may succeed on retry — e.g. 502/503/504
-        # when a source site is under load (DDoS). Retry a bounded number of
-        # times with a short delay. Client errors (4xx) are never retried and
-        # fall through to the status-code handling below.
-        transient_statuses = (502, 503, 504)
-        max_attempts = 3
-        retry_delay_secs = 5
-
-        for attempt in range(max_attempts):
-            # use keyword argument unpack to convert dict to keyword args
-            response = request_method(**requests_data_dict)
-
-            # get status code and content returned
-            status_code = response.status_code
-            content = response.content
-
-            if status_code in transient_statuses and attempt < max_attempts - 1:
-                app_logger_instance.warning(
-                    "Transient HTTP status %s from %s, retrying (%d/%d)..."
-                    % (status_code, url, attempt + 1, max_attempts)
-                )
-                time.sleep(retry_delay_secs)
-            else:
-                break
-
-        if status_code == 401:
-            app_logger_instance.warning(
-                "The status code %s indicates unauthorised access for %s, error is %s" % (status_code, url, content)
-            )
-            raise requests.exceptions.HTTPError(status_code, url, content)
-
-        elif status_code == 404:
-            app_logger_instance.warning(
-                "The status code %s indicates the requested resource could not be found  for %s, error is %s"
-                % (status_code, url, content)
-            )
-            raise requests.exceptions.HTTPError(status_code, url, content)
-
-        elif status_code == 422:
-            app_logger_instance.warning(
-                "The status code %s indicates a request was well-formed but was unable "
-                "to be followed due to semantic errors for %s, error is %s" % (status_code, url, content)
-            )
-            raise requests.exceptions.HTTPError(status_code, url, content)
-
-        elif not 200 <= status_code <= 299:
-            app_logger_instance.warning(
-                "The status code %s indicates an unexpected error for %s, error is %s" % (status_code, url, content)
-            )
-            raise requests.exceptions.HTTPError(status_code, url, content)
-
-    except requests.exceptions.ConnectTimeout as content:
-        # connect timeout occurred
-        app_logger_instance.warning("Connection timeout for URL %s with error %s" % (url, content))
-        return 1, status_code, content
-
-    except requests.exceptions.ConnectionError as content:
-        # connection error occurred
-        app_logger_instance.warning("Connection error for URL %s with error %s" % (url, content))
-        return 1, status_code, content
-
-    except requests.exceptions.TooManyRedirects as content:
-        # too many redirects, bad site or circular redirect
-        app_logger_instance.warning("Too many retries for URL %s with error %s" % (url, content))
-        return 1, status_code, content
+        status_code, content = _execute_http_request(
+            session,
+            url,
+            parsed["user_agent"],
+            parsed["request_type"],
+            parsed["auth"],
+            parsed["additional_header"],
+            parsed["data_payload"],
+            parsed["json_payload"],
+            effective_verify_ssl,
+        )
+        _check_http_status(status_code, url, content)
 
     except requests.exceptions.HTTPError as content:
-        # catch http exceptions thrown by requests
-        return 1, status_code, content
-
-    except requests.exceptions.ReadTimeout as content:
-        # read timeout occurred
-        app_logger_instance.warning("Read timeout for URL %s with error %s" % (url, content))
+        # HTTP error already logged by _check_http_status
         return 1, status_code, content
 
     except requests.exceptions.RequestException as content:
-        # catch any other exceptions thrown by requests
-        app_logger_instance.warning("Caught other exceptions for URL %s with error %s" % (url, content))
+        # All remaining requests exceptions (timeouts, connection errors, redirects)
+        app_logger_instance.warning("%s for URL %s with error %s" % (type(content).__name__, url, content))
         return 1, status_code, content
 
-    else:
-        if 200 <= status_code <= 299:
-            app_logger_instance.info("The status code %s indicates a successful request for %s" % (status_code, url))
-            return 0, status_code, content
+    app_logger_instance.info("The status code %s indicates a successful request for %s" % (status_code, url))
+    return 0, status_code, content
 
 
 def github_create_release(current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent):
@@ -599,57 +582,53 @@ def check_site(**kwargs):
             app_logger_instance.warning(f"'{site_name}' site down for '{url}'")
             break
 
-    # Retrieve previous notification state for this site (defaults to "up, never notified")
+    _handle_site_state(site_name, url, site_down, notification_cooldown_hours)
+
+    return site_down
+
+
+def _handle_site_state(site_name, url, site_down, notification_cooldown_hours):
+    """Send site_error/site_recovered notifications on state transitions.
+
+    Updates _site_down_state in place. Sends a first-time alert on UP→DOWN,
+    re-notifies after the cooldown elapses, and sends a recovery email on DOWN→UP.
+    """
     previous_state = _site_down_state.get(site_name, {"is_down": False, "notified_at": None})
     was_down = previous_state["is_down"]
     last_notified = previous_state.get("notified_at")
 
-    if site_down:
-        if not was_down:
-            # Transition: UP → DOWN — send first-time alert and record state
-            msg_type = "site_error"
-            error_msg = f"{site_name} site down - '{url}'"
-            notification_email(msg_type=msg_type, error_msg=error_msg, source_site_name=site_name, source_site_url=url)
-            app_logger_instance.warning(error_msg)
-            _site_down_state[site_name] = {"is_down": True, "notified_at": datetime.datetime.now(datetime.UTC)}
-
-        else:
-            # Site was already known down — only re-notify after the cooldown period elapses
-            now = datetime.datetime.now(datetime.UTC)
-            hours_since_notif = (
-                ((now - last_notified).total_seconds() / 3600) if last_notified else notification_cooldown_hours
-            )
-
-            if hours_since_notif >= notification_cooldown_hours:
-                msg_type = "site_error"
-                error_msg = (
-                    f"{site_name} site still down - '{url}' (ongoing issue, last notified {hours_since_notif:.1f}h ago)"
-                )
-                notification_email(
-                    msg_type=msg_type, error_msg=error_msg, source_site_name=site_name, source_site_url=url
-                )
-                app_logger_instance.warning(error_msg)
-                _site_down_state[site_name] = {"is_down": True, "notified_at": now}
-
-            else:
-                app_logger_instance.info(
-                    f"'{site_name}' already known down, suppressing repeat notification "
-                    f"(last notified {hours_since_notif:.1f}h ago, cooldown {notification_cooldown_hours}h)"
-                )
-
-    else:
+    if not site_down:
         if was_down:
-            # Transition: DOWN → UP — send a recovery notification and clear state
-            msg_type = "site_recovered"
             recovery_msg = f"{site_name} site has recovered - '{url}'"
             notification_email(
-                msg_type=msg_type, error_msg=recovery_msg, source_site_name=site_name, source_site_url=url
+                msg_type="site_recovered", error_msg=recovery_msg, source_site_name=site_name, source_site_url=url
             )
             app_logger_instance.info(recovery_msg)
-
         _site_down_state[site_name] = {"is_down": False, "notified_at": None}
+        return
 
-    return site_down
+    if not was_down:
+        # Transition: UP → DOWN — send first-time alert and record state
+        error_msg = f"{site_name} site down - '{url}'"
+        notification_email(msg_type="site_error", error_msg=error_msg, source_site_name=site_name, source_site_url=url)
+        app_logger_instance.warning(error_msg)
+        _site_down_state[site_name] = {"is_down": True, "notified_at": datetime.datetime.now(datetime.UTC)}
+        return
+
+    # Site was already known down — only re-notify after the cooldown period elapses
+    now = datetime.datetime.now(datetime.UTC)
+    hours_since_notif = ((now - last_notified).total_seconds() / 3600) if last_notified else notification_cooldown_hours
+
+    if hours_since_notif >= notification_cooldown_hours:
+        error_msg = f"{site_name} site still down - '{url}' (ongoing issue, last notified {hours_since_notif:.1f}h ago)"
+        notification_email(msg_type="site_error", error_msg=error_msg, source_site_name=site_name, source_site_url=url)
+        app_logger_instance.warning(error_msg)
+        _site_down_state[site_name] = {"is_down": True, "notified_at": now}
+    else:
+        app_logger_instance.info(
+            f"'{site_name}' already known down, suppressing repeat notification "
+            f"(last notified {hours_since_notif:.1f}h ago, cooldown {notification_cooldown_hours}h)"
+        )
 
 
 def github_target_last_release_date(target_repo_owner, target_repo_name, user_agent):
@@ -693,28 +672,28 @@ def github_target_last_release_date(target_repo_owner, target_repo_name, user_ag
     return 0, target_last_release_date
 
 
+def _github_query_mapping(source_query_type):
+    """Map a github source_query_type to (github_query_type, json_query).
+
+    Returns (None, None) for an unknown query type.
+    """
+    mapping = {
+        "tag": ("tags", "name"),
+        "pre-release": ("releases", "tag_name"),
+        "release": ("releases/latest", "tag_name"),
+        "branch": ("commits", "sha"),
+    }
+    return mapping.get((source_query_type or "").lower(), (None, None))
+
+
 def github_apps(source_app_name, source_query_type, source_repo_name, user_agent, source_branch_name):
 
     # certain github repos do not have releases, only tags, thus we need to account for these differently
-    if source_query_type.lower() == "tag":
-        github_query_type = "tags"
-        json_query = "name"
+    github_query_type, json_query = _github_query_mapping(source_query_type)
 
-    elif source_query_type.lower() == "pre-release":
-        github_query_type = "releases"
-        json_query = "tag_name"
-
-    elif source_query_type.lower() == "release":
-        github_query_type = "releases/latest"
-        json_query = "tag_name"
-
-    elif source_query_type.lower() == "branch":
-        github_query_type = "commits"
-        json_query = "sha"
-
-    else:
+    if github_query_type is None:
         app_logger_instance.warning(
-            "source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type.lower()
+            "source_query_type '%s' is not valid, skipping to next iteration..." % source_query_type
         )
         return None, None
 
@@ -751,19 +730,11 @@ def github_apps(source_app_name, source_query_type, source_repo_name, user_agent
         return None, source_site_url
 
     try:
-        if github_query_type in ("tags", "commits", "releases"):
-            # get tag/sha from json
-            current_version = content[0]["%s" % json_query]
-
-        elif github_query_type == "releases/latest":
-            # get release from json
+        # releases/latest returns a dict; tags/commits/releases return a list
+        if github_query_type == "releases/latest":
             current_version = content["%s" % json_query]
-
         else:
-            app_logger_instance.warning(
-                "Unknown Github query type of '%s', skipping to next iteration..." % github_query_type
-            )
-            return None, source_site_url
+            current_version = content[0]["%s" % json_query]
 
     except (IndexError, KeyError):
         app_logger_instance.warning("Problem parsing json from %s, skipping to next iteration..." % url)
@@ -881,11 +852,6 @@ def aor_apps(source_app_name, user_agent):
         # filter python objects with list comprehension to prevent fuzzy mismatch
         content = [x for x in content["results"] if x["pkgname"] == source_app_name]
 
-    except (ValueError, TypeError, KeyError, IndexError):
-        app_logger_instance.info("Problem loading json from %s" % url)
-        return None, source_site_url
-
-    try:
         # get package version and release number from json
         pkgver = content[0]["pkgver"]
         pkgrel = content[0]["pkgrel"]
@@ -894,7 +860,7 @@ def aor_apps(source_app_name, user_agent):
         current_version = "%s-%s" % (pkgver, pkgrel)
 
     except (ValueError, TypeError, KeyError, IndexError):
-        app_logger_instance.info("Problem parsing json from %s, skipping to next iteration..." % url)
+        app_logger_instance.info("Problem loading or parsing json from %s, skipping to next iteration..." % url)
         return None, source_site_url
 
     return current_version, source_site_url
@@ -933,33 +899,6 @@ def aur_apps(source_app_name, user_agent):
         return None, source_site_url
 
     return current_version, source_site_url
-
-
-# NOTE: This function is named soup_regex for historical reasons but does not use regex —
-# it returns a BeautifulSoup object from the HTML at the given URL.
-def soup_regex(source_site_url, user_agent):
-
-    # download webpage
-    request_type = "get"
-
-    # download webpage content
-    return_code, status_code, content = http_client(
-        url=source_site_url, user_agent=user_agent, request_type=request_type
-    )
-
-    if return_code == 0:
-        try:
-            soup = BeautifulSoup(content, features="html.parser")
-
-        except (ValueError, TypeError, KeyError):
-            app_logger_instance.info("Problem extracting url using regex from url  %s" % source_site_url)
-            return None, None
-
-    else:
-        app_logger_instance.info("Problem downloading webpage from url  %s" % source_site_url)
-        return None, None
-
-    return soup, source_site_url
 
 
 APP_DOWN_COUNTER_MAX = 3  # max consecutive failed-app-detection emails before suppressing
@@ -1013,10 +952,370 @@ def _handle_app_fetch(current_version, site_key, source_site_name, source_app_na
     return True
 
 
+def _notify_app_error(site_key, source_site_name, source_app_name, source_repo_name, source_site_url, error_msg):
+    """Send an app_error notification bounded by APP_DOWN_COUNTER_MAX.
+
+    Used by the regex/minecraft branches that do not follow the
+    current_version=None pattern of _handle_app_fetch. Increments the persistent
+    failure counter and only emails while the count is at or below the max, so a
+    prolonged upstream outage does not produce one email per scheduler run.
+    """
+    _app_down_counters[site_key] = _app_down_counters.get(site_key, 0) + 1
+
+    if _app_down_counters[site_key] <= APP_DOWN_COUNTER_MAX:
+        notification_email(
+            msg_type="app_error",
+            error_msg=error_msg,
+            source_site_name=source_site_name,
+            source_repo_name=source_repo_name,
+            source_app_name=source_app_name,
+            source_site_url=source_site_url,
+        )
+    else:
+        app_logger_instance.info(
+            f"Number of failed downloads for site '{source_site_name}' "
+            f"has exceeded '{APP_DOWN_COUNTER_MAX}', skipping notifications"
+        )
+
+    app_logger_instance.warning(error_msg)
+
+
+def _handle_version_change(
+    site_item,
+    source_site_name,
+    source_app_name,
+    source_repo_name,
+    source_site_url,
+    target_repo_name,
+    target_repo_branch,
+    target_repo_owner,
+    action,
+    current_version,
+    previous_version,
+    grace_period_mins,
+    target_release_days,
+    source_version_change_datetime,
+    user_agent_chrome,
+):
+    """Handle a detected version change for one app.
+
+    Performs the trigger (with grace-period and release-days throttling) or
+    notify action, then sends the notification and updates config. Returns True
+    if the caller should skip the remainder of the current site iteration.
+    """
+    if action == "trigger":
+        if _trigger_release(
+            site_item,
+            source_site_name,
+            source_app_name,
+            target_repo_name,
+            target_repo_branch,
+            target_repo_owner,
+            current_version,
+            previous_version,
+            grace_period_mins,
+            target_release_days,
+            source_version_change_datetime,
+            user_agent_chrome,
+        ):
+            return True
+
+    elif action == "notify":
+        app_logger_instance.info(
+            "Previous version %s and current version %s are different" % (previous_version, current_version)
+        )
+
+    app_logger_instance.debug("Writing current version %s to config.ini" % current_version)
+    config_obj["results"]["%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)] = (
+        current_version
+    )
+    config_obj.write()
+
+    notification_email(
+        action=action,
+        source_app_name=source_app_name,
+        source_repo_name=source_repo_name,
+        source_site_name=source_site_name,
+        source_site_url=source_site_url,
+        target_repo_name=target_repo_name,
+        previous_version=previous_version,
+        current_version=current_version,
+    )
+
+    notification_kodi(action, source_app_name, current_version)
+
+    return False
+
+
+def _throttle_by_grace_period(
+    site_item,
+    source_app_name,
+    grace_period_mins,
+    source_version_change_datetime,
+    current_datetime_object,
+    current_datetime_str,
+):
+    """Return True if the trigger should be skipped due to the grace period."""
+    if not grace_period_mins:
+        return False
+
+    if source_version_change_datetime is None:
+        app_logger_instance.debug("Trigger datetime not defined in config.ini, creating from current datetime")
+        site_item["source_version_change_datetime"] = current_datetime_str
+        config_obj.write()
+        return True
+
+    source_version_change_datetime_object = datetime.datetime.strptime(
+        source_version_change_datetime, "%Y-%m-%d %H:%M:%S"
+    )
+
+    if not time_check(current_datetime_object, grace_period_mins, source_version_change_datetime_object):
+        app_logger_instance.info(
+            "Source version change for app '%s' is less than '%s' mins ago, "
+            "skipping to next iteration..." % (source_app_name, grace_period_mins)
+        )
+        return True
+
+    app_logger_instance.info(
+        "Source version change for app '%s' is >= '%s' mins ago, proceeding..." % (source_app_name, grace_period_mins)
+    )
+    return False
+
+
+def _throttle_by_release_days(
+    target_repo_owner, target_repo_name, user_agent_chrome, target_release_days, current_datetime_object
+):
+    """Return True if the trigger should be skipped due to release-day throttling."""
+    if not target_release_days:
+        return False
+
+    return_code, last_release_date = github_target_last_release_date(
+        target_repo_owner, target_repo_name, user_agent_chrome
+    )
+
+    if return_code != 0:
+        app_logger_instance.warning(
+            "Unable to identify target release date for repo '%s', skipping to next iteration..." % target_repo_name
+        )
+        return True
+
+    target_release_date_object = datetime.datetime.strptime(last_release_date, "%Y-%m-%dT%H:%M:%SZ")
+    target_time_delta_days = (current_datetime_object - target_release_date_object).days
+    app_logger_instance.debug("Minimum days between target releases is '%s' days" % target_release_days)
+    app_logger_instance.debug("Last target release was '%s' days ago" % target_time_delta_days)
+
+    if int(target_time_delta_days) < int(target_release_days):
+        app_logger_instance.info(
+            "Last target release date for app '%s' is less than '%s' days ago, "
+            "skipping to next iteration..." % (target_repo_name, target_release_days)
+        )
+        return True
+
+    app_logger_instance.info(
+        "Last target release date for app '%s' is >= '%s' days ago, proceeding..."
+        % (target_repo_name, target_release_days)
+    )
+    return False
+
+
+def _trigger_release(
+    site_item,
+    source_site_name,
+    source_app_name,
+    target_repo_name,
+    target_repo_branch,
+    target_repo_owner,
+    current_version,
+    previous_version,
+    grace_period_mins,
+    target_release_days,
+    source_version_change_datetime,
+    user_agent_chrome,
+):
+    """Create the GitHub release for a detected version change.
+
+    Applies grace-period and release-days throttling first. Returns True if the
+    caller should skip the remainder of the current site iteration.
+    """
+    current_datetime_object = datetime.datetime.now()
+    current_datetime_str = current_datetime_object.strftime("%Y-%m-%d %H:%M:%S")
+
+    if _throttle_by_grace_period(
+        site_item,
+        source_app_name,
+        grace_period_mins,
+        source_version_change_datetime,
+        current_datetime_object,
+        current_datetime_str,
+    ):
+        return True
+
+    if _throttle_by_release_days(
+        target_repo_owner, target_repo_name, user_agent_chrome, target_release_days, current_datetime_object
+    ):
+        return True
+
+    app_logger_instance.info(
+        "Previous version %s and current version %s are different, "
+        "triggering a docker hub build (via github tag)..." % (previous_version, current_version)
+    )
+    return_code, status_code, content = github_create_release(
+        current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent_chrome
+    )
+
+    if status_code == 201:
+        app_logger_instance.info(
+            "Setting previous version %s to the same as current version %s after successful build"
+            % (previous_version, current_version)
+        )
+    else:
+        # TODO this is a hack to work around the fact we have converted dict to keyword args
+        regex_code = r'(?<="code":\s")[^"]+'
+        try:
+            code = (re.search(regex_code, str(content))).group(0)
+            if code.lower() == "already_exists":
+                app_logger_instance.warning(
+                    "Problem creating GitHub release as it already exists for '%s/%s', "
+                    "overwriting current version and skipping to next iteration..."
+                    % (target_repo_owner, target_repo_name)
+                )
+                app_logger_instance.debug("Writing current version %s to config.ini" % current_version)
+                config_obj["results"][
+                    "%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)
+                ] = current_version
+                config_obj.write()
+        except AttributeError:
+            app_logger_instance.warning(
+                "Problem creating GitHub release due to unknown error for '%s/%s', "
+                "skipping to next iteration..." % (target_repo_owner, target_repo_name)
+            )
+        return True
+
+    if source_version_change_datetime is not None:
+        app_logger_instance.debug("Deleting 'source_version_change_datetime', used next time version change occurs")
+        del site_item["source_version_change_datetime"]
+        config_obj.write()
+
+    app_logger_instance.debug("Creating 'target_trigger_datetime', used to track when trigger of docker build happened")
+    site_item["target_trigger_datetime"] = current_datetime_str
+    config_obj.write()
+
+    return False
+
+
+def _fetch_regex_version(source_app_name, source_site_name, source_repo_name, source_site_url, user_agent_chrome):
+    """Fetch the current version for a regex-based (minecraft) app.
+
+    Returns (current_version, source_site_url); current_version is None on
+    failure (a bounded app_error notification has already been sent).
+    """
+    if source_app_name == "minecraftbedrock":
+        return _fetch_bedrock_version(
+            source_site_name, source_app_name, source_repo_name, source_site_url, user_agent_chrome
+        )
+
+    if source_app_name == "minecraftserver":
+        return _fetch_minecraftserver_version(source_site_name, source_app_name, source_repo_name, user_agent_chrome)
+
+    app_logger_instance.warning("Source site app %s unknown, skipping to next iteration..." % source_app_name)
+    return None, source_site_url
+
+
+def _fetch_bedrock_version(source_site_name, source_app_name, source_repo_name, source_site_url, user_agent_chrome):
+    """Fetch the bedrock server version from the Mojang download-links API."""
+    bedrock_unofficial_api = "https://net-secondary.web.minecraft-services.net/api/v1.0/download/links"
+    return_code, status_code, content = http_client(
+        url=bedrock_unofficial_api, user_agent=user_agent_chrome, request_type="get"
+    )
+
+    if return_code != 0:
+        _notify_app_error(
+            f"regex:{source_app_name}",
+            source_site_name,
+            source_app_name,
+            source_repo_name,
+            source_site_url,
+            "Unable to get bedrock download links from API for app %s, skipping to next iteration..." % source_app_name,
+        )
+        return None, source_site_url
+
+    try:
+        api_data = json.loads(content)
+        download_url = None
+        for link_item in api_data["result"]["links"]:
+            if link_item["downloadType"] == "serverBedrockLinux":
+                download_url = link_item["downloadUrl"]
+                break
+
+        if not download_url:
+            raise KeyError("serverBedrockLinux not found in API response")
+
+        version_match = re.search(r"bedrock-server-(.*)\.zip", download_url)
+        if not version_match:
+            raise ValueError("Could not extract version from download URL")
+
+        return version_match.group(1), source_site_url
+
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        _notify_app_error(
+            f"regex:{source_app_name}",
+            source_site_name,
+            source_app_name,
+            source_repo_name,
+            source_site_url,
+            "Unable to parse bedrock API response for app %s: %s" % (source_app_name, str(e)),
+        )
+        return None, source_site_url
+
+
+def _fetch_minecraftserver_version(source_site_name, source_app_name, source_repo_name, user_agent_chrome):
+    """Fetch the Java edition server version from the Mojang version manifest."""
+    source_site_url = "https://launchermeta.mojang.com/mc/game/version_manifest.json"
+    return_code, status_code, content = http_client(
+        url=source_site_url, user_agent=user_agent_chrome, request_type="get"
+    )
+
+    if return_code != 0:
+        _notify_app_error(
+            f"regex:{source_app_name}",
+            source_site_name,
+            source_app_name,
+            source_repo_name,
+            source_site_url,
+            "Problem downloading version manifest for url '%s', skipping to next iteration..." % source_site_url,
+        )
+        return None, source_site_url
+
+    try:
+        current_version = json.loads(content)["latest"]["release"]
+        return current_version, source_site_url
+
+    except (json.JSONDecodeError, ValueError, IndexError, KeyError):
+        _notify_app_error(
+            f"regex:{source_app_name}",
+            source_site_name,
+            source_app_name,
+            source_repo_name,
+            source_site_url,
+            "Unable to identify current release version for app '%s', ignoring..." % source_app_name,
+        )
+        return None, source_site_url
+
+
 def monitor_sites():
 
     # read sites list from config
     config_site_list = config_obj["monitor_sites"]["site_list"]
+
+    # Defensive: a legacy or malformed config may leave site_list as a plain
+    # string (the old configspec default was a quoted string). Treat it as an
+    # empty list rather than iterating string characters and crashing.
+    if not isinstance(config_site_list, list):
+        app_logger_instance.warning(
+            "site_list in config.ini is not a list (got %s), no sites to monitor" % type(config_site_list).__name__
+        )
+        config_site_list = []
+
     target_repo_owner = config_obj["general"]["target_repo_owner"]
 
     # pretend to be windows 10 running chrome (required for minecraft bedrock)
@@ -1068,7 +1367,9 @@ def monitor_sites():
         target_release_days = site_item.get("target_release_days")
         target_repo_name = site_item.get("target_repo_name")
         target_repo_branch = site_item.get("target_repo_branch")
-        source_query_type = site_item.get("source_query_type")
+        # Normalise to empty string so a missing source_query_type is handled
+        # as "invalid" by the site functions instead of crashing on .lower().
+        source_query_type = site_item.get("source_query_type") or ""
         grace_period_mins = site_item.get("grace_period_mins")
         source_version_change_datetime = site_item.get("source_version_change_datetime")
         action = site_item.get("action")
@@ -1212,136 +1513,15 @@ def monitor_sites():
                 continue
 
         elif source_site_name == "regex":
-            if source_app_name == "minecraftbedrock":
-                request_type = "get"
-                bedrock_unofficial_api = "https://net-secondary.web.minecraft-services.net/api/v1.0/download/links"
-                return_code, status_code, content = http_client(
-                    url=bedrock_unofficial_api, user_agent=user_agent_chrome, request_type=request_type
-                )
+            current_version, source_site_url = _fetch_regex_version(
+                source_app_name, source_site_name, source_repo_name, source_site_url, user_agent_chrome
+            )
 
-                if return_code != 0:
-                    msg_type = "app_error"
-                    error_msg = (
-                        "Unable to get bedrock download links from API for app %s, skipping to next iteration..."
-                        % source_app_name
-                    )
-                    notification_email(
-                        msg_type=msg_type,
-                        error_msg=error_msg,
-                        source_site_name=source_site_name,
-                        source_repo_name=source_repo_name,
-                        source_app_name=source_app_name,
-                        source_site_url=source_site_url,
-                    )
-                    app_logger_instance.warning(error_msg)
-                    continue
-
-                else:
-                    try:
-                        # Parse the JSON response
-                        api_data = json.loads(content)
-
-                        # Find the serverBedrockLinux entry
-                        download_url = None
-                        for link_item in api_data["result"]["links"]:
-                            if link_item["downloadType"] == "serverBedrockLinux":
-                                download_url = link_item["downloadUrl"]
-                                break
-
-                        if not download_url:
-                            raise KeyError("serverBedrockLinux not found in API response")
-
-                        # Extract version from the download URL using regex
-                        # URL format: https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.90.4.zip
-                        version_match = re.search(r"bedrock-server-(.*)\.zip", download_url)
-                        if version_match:
-                            current_version = version_match.group(1)
-                        else:
-                            raise ValueError("Could not extract version from download URL")
-
-                    except (json.JSONDecodeError, KeyError, ValueError) as e:
-                        msg_type = "app_error"
-                        error_msg = "Unable to parse bedrock API response for app %s: %s" % (source_app_name, str(e))
-                        notification_email(
-                            msg_type=msg_type,
-                            error_msg=error_msg,
-                            source_site_name=source_site_name,
-                            source_repo_name=source_repo_name,
-                            source_app_name=source_app_name,
-                            source_site_url=source_site_url,
-                        )
-                        app_logger_instance.warning(error_msg)
-                        continue
-
-            elif source_app_name == "minecraftserver":
-                request_type = "get"
-                source_site_url = "https://launchermeta.mojang.com/mc/game/version_manifest.json"
-
-                # get version manifest content
-                return_code, status_code, content = http_client(
-                    url=source_site_url, user_agent=user_agent_chrome, request_type=request_type
-                )
-
-                if return_code != 0:
-                    msg_type = "app_error"
-                    error_msg = (
-                        "Problem downloading version manifest for url '%s', skipping to next iteration..."
-                        % source_site_url
-                    )
-                    notification_email(
-                        msg_type=msg_type,
-                        error_msg=error_msg,
-                        source_site_name=source_site_name,
-                        source_repo_name=source_repo_name,
-                        source_app_name=source_app_name,
-                        source_site_url=source_site_url,
-                    )
-                    app_logger_instance.warning(error_msg)
-                    continue
-
-                version_manifest_content = None
-                try:
-                    version_manifest_content = json.loads(content)
-
-                except (json.JSONDecodeError, ValueError):
-                    msg_type = "app_error"
-                    error_msg = (
-                        "Unable to decode version manifest json for app '%s', skipping to next iteration..."
-                        % source_app_name
-                    )
-                    notification_email(
-                        msg_type=msg_type,
-                        error_msg=error_msg,
-                        source_site_name=source_site_name,
-                        source_repo_name=source_repo_name,
-                        source_app_name=source_app_name,
-                        source_site_url=source_site_url,
-                    )
-                    app_logger_instance.warning(error_msg)
-                    continue
-
-                try:
-                    current_version = version_manifest_content["latest"]["release"]
-
-                except (IndexError, KeyError):
-                    msg_type = "app_error"
-                    error_msg = "Unable to identify current release version for app '%s', ignoring..." % source_app_name
-                    notification_email(
-                        msg_type=msg_type,
-                        error_msg=error_msg,
-                        source_site_name=source_site_name,
-                        source_repo_name=source_repo_name,
-                        source_app_name=source_app_name,
-                        source_site_url=source_site_url,
-                    )
-                    app_logger_instance.warning(error_msg)
-                    continue
-
-            else:
-                app_logger_instance.warning(
-                    "Source site app %s unknown, skipping to next iteration..." % source_app_name
-                )
+            if current_version is None:
                 continue
+
+            # Successful regex fetch — reset this app's failure counter
+            _app_down_counters.pop(f"regex:{source_app_name}", None)
 
         else:
             app_logger_instance.warning("Source site name %s unknown, skipping to next iteration..." % source_site_name)
@@ -1371,153 +1551,24 @@ def monitor_sites():
             continue
 
         if previous_version != current_version:
-            if action == "trigger":
-                current_datetime_object = datetime.datetime.now()
-                current_datetime_str = current_datetime_object.strftime("%Y-%m-%d %H:%M:%S")
-
-                if grace_period_mins:
-                    if source_version_change_datetime is None:
-                        app_logger_instance.debug(
-                            "Trigger datetime not defined in config.ini, creating from current datetime"
-                        )
-                        source_version_change_datetime = current_datetime_str
-
-                        site_item["source_version_change_datetime"] = source_version_change_datetime
-                        config_obj.write()
-                        continue
-
-                    # run function to check if time since last source change is greater than or equal to grace period
-                    else:
-                        source_version_change_datetime_object = datetime.datetime.strptime(
-                            source_version_change_datetime, "%Y-%m-%d %H:%M:%S"
-                        )
-
-                        if not time_check(
-                            current_datetime_object, grace_period_mins, source_version_change_datetime_object
-                        ):
-                            app_logger_instance.info(
-                                "Source version change for app '%s' is less than '%s' mins ago, "
-                                "skipping to next iteration..." % (source_app_name, grace_period_mins)
-                            )
-                            continue
-
-                        else:
-                            app_logger_instance.info(
-                                "Source version change for app '%s' is >= '%s' mins ago, proceeding..."
-                                % (source_app_name, grace_period_mins)
-                            )
-
-                if target_release_days:
-                    return_code, last_release_date = github_target_last_release_date(
-                        target_repo_owner, target_repo_name, user_agent_chrome
-                    )
-
-                    if return_code != 0:
-                        app_logger_instance.warning(
-                            "Unable to identify target release date for repo '%s', skipping to next iteration..."
-                            % target_repo_name
-                        )
-                        continue
-
-                    target_release_date_object = datetime.datetime.strptime(last_release_date, "%Y-%m-%dT%H:%M:%SZ")
-
-                    # compare difference between local date/time and trigger date/time to produce timedelta
-                    target_time_delta = current_datetime_object - target_release_date_object
-
-                    # extract days from time delta
-                    target_time_delta_days = target_time_delta.days
-                    app_logger_instance.debug("Minimum days between target releases is '%s' days" % target_release_days)
-                    app_logger_instance.debug("Last target release was '%s' days ago" % target_time_delta_days)
-
-                    if int(target_time_delta_days) >= int(target_release_days):
-                        app_logger_instance.info(
-                            "Last target release date for app '%s' is >= '%s' days ago, proceeding..."
-                            % (target_repo_name, target_release_days)
-                        )
-
-                    else:
-                        app_logger_instance.info(
-                            "Last target release date for app '%s' is less than '%s' days ago, "
-                            "skipping to next iteration..." % (target_repo_name, target_release_days)
-                        )
-                        continue
-
-                app_logger_instance.info(
-                    "Previous version %s and current version %s are different, "
-                    "triggering a docker hub build (via github tag)..." % (previous_version, current_version)
-                )
-                return_code, status_code, content = github_create_release(
-                    current_version, target_repo_branch, target_repo_owner, target_repo_name, user_agent_chrome
-                )
-
-                if status_code == 201:
-                    app_logger_instance.info(
-                        "Setting previous version %s to the same as current version %s after successful build"
-                        % (previous_version, current_version)
-                    )
-
-                else:
-                    # TODO this is a hack to work around the fact we have converted dict to keyword args
-                    regex_code = r'(?<="code":\s")[^"]+'
-
-                    try:
-                        code = (re.search(regex_code, str(content))).group(0)
-                        if code.lower() == "already_exists":
-                            app_logger_instance.warning(
-                                "Problem creating GitHub release as it already exists for '%s/%s', "
-                                "overwriting current version and skipping to next iteration..."
-                                % (target_repo_owner, target_repo_name)
-                            )
-                            app_logger_instance.debug("Writing current version %s to config.ini" % current_version)
-                            config_obj["results"][
-                                "%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)
-                            ] = current_version
-                            config_obj.write()
-
-                    except AttributeError:
-                        app_logger_instance.warning(
-                            "Problem creating GitHub release due to unknown error for '%s/%s', "
-                            "skipping to next iteration..." % (target_repo_owner, target_repo_name)
-                        )
-
-                    continue
-
-                if source_version_change_datetime is not None:
-                    app_logger_instance.debug(
-                        "Deleting 'source_version_change_datetime', used next time version change occurs"
-                    )
-                    del site_item["source_version_change_datetime"]
-                    config_obj.write()
-
-                app_logger_instance.debug(
-                    "Creating 'target_trigger_datetime', used to track when trigger of docker build happened"
-                )
-                site_item["target_trigger_datetime"] = current_datetime_str
-                config_obj.write()
-
-            elif action == "notify":
-                app_logger_instance.info(
-                    "Previous version %s and current version %s are different" % (previous_version, current_version)
-                )
-
-            app_logger_instance.debug("Writing current version %s to config.ini" % current_version)
-            config_obj["results"][
-                "%s_%s_%s_previous_version" % (source_site_name, source_app_name, target_repo_name)
-            ] = current_version
-            config_obj.write()
-
-            notification_email(
-                action=action,
-                source_app_name=source_app_name,
-                source_repo_name=source_repo_name,
-                source_site_name=source_site_name,
-                source_site_url=source_site_url,
-                target_repo_name=target_repo_name,
-                previous_version=previous_version,
-                current_version=current_version,
-            )
-
-            notification_kodi(action, source_app_name, current_version)
+            if _handle_version_change(
+                site_item,
+                source_site_name,
+                source_app_name,
+                source_repo_name,
+                source_site_url,
+                target_repo_name,
+                target_repo_branch,
+                target_repo_owner,
+                action,
+                current_version,
+                previous_version,
+                grace_period_mins,
+                target_release_days,
+                source_version_change_datetime,
+                user_agent_chrome,
+            ):
+                continue
 
         else:
             app_logger_instance.info(
@@ -1563,7 +1614,7 @@ def scheduler_start():
 
 # required to prevent separate process from trying to load parent process
 if __name__ == "__main__":
-    version = "1.2.5"
+    version = "1.2.6"
 
     # custom argparse to redirect user to help if unknown argument specified
     class ArgparseCustom(argparse.ArgumentParser):

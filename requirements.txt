@@ -1,7 +1,6 @@
 appdirs==1.4.4
 argparse==1.4.0
 backoff==2.2.1
-beautifulSoup4==4.12.3
 configobj==5.0.9
 python-daemon==3.1.2
 kodi-json==1.0.0

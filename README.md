@@ -42,9 +42,6 @@ python3 ./TriggerDockerBuild.py --config ./configs --logs ./logs
 python3 ./TriggerDockerBuild.py --config ./configs --logs ./logs --schedule
 ```
 
-**Future:**
-- Use Beautiful Soup to also web scrape for non API sites.
-
 **Known Issues:**
 - TBA
 ___
